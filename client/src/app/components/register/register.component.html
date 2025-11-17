@@ -1,0 +1,128 @@
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="card mt-5">
+      <div class="card-header">
+        <h3 class="text-center mb-0">用户注册</h3>
+      </div>
+      <div class="card-body">
+        <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="name" class="form-label">姓名 *</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  id="name"
+                  formControlName="name"
+                  [class.is-invalid]="registerForm.get('name')?.invalid && registerForm.get('name')?.touched">
+                <div class="invalid-feedback" *ngIf="registerForm.get('name')?.errors?.['required']">
+                  请输入姓名
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="email" class="form-label">邮箱 *</label>
+                <input 
+                  type="email" 
+                  class="form-control" 
+                  id="email"
+                  formControlName="email"
+                  [class.is-invalid]="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">
+                <div class="invalid-feedback" *ngIf="registerForm.get('email')?.errors?.['required']">
+                  请输入邮箱
+                </div>
+                <div class="invalid-feedback" *ngIf="registerForm.get('email')?.errors?.['email']">
+                  请输入有效的邮箱地址
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="password" class="form-label">密码 *</label>
+                <input 
+                  type="password" 
+                  class="form-control" 
+                  id="password"
+                  formControlName="password"
+                  [class.is-invalid]="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">
+                <div class="invalid-feedback" *ngIf="registerForm.get('password')?.errors?.['required']">
+                  请输入密码
+                </div>
+                <div class="invalid-feedback" *ngIf="registerForm.get('password')?.errors?.['minlength']">
+                  密码至少6位
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="confirmPassword" class="form-label">确认密码 *</label>
+                <input 
+                  type="password" 
+                  class="form-control" 
+                  id="confirmPassword"
+                  formControlName="confirmPassword"
+                  [class.is-invalid]="registerForm.get('confirmPassword')?.invalid && registerForm.get('confirmPassword')?.touched">
+                <div class="invalid-feedback" *ngIf="registerForm.get('confirmPassword')?.errors?.['required']">
+                  请确认密码
+                </div>
+                <div class="invalid-feedback" *ngIf="registerForm.get('confirmPassword')?.errors?.['passwordMismatch']">
+                  密码不一致
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="company" class="form-label">公司名称</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  id="company"
+                  formControlName="company">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="phone" class="form-label">手机号码</label>
+                <input 
+                  type="tel" 
+                  class="form-control" 
+                  id="phone"
+                  formControlName="phone"
+                  [class.is-invalid]="registerForm.get('phone')?.invalid && registerForm.get('phone')?.touched">
+                <div class="invalid-feedback" *ngIf="registerForm.get('phone')?.errors?.['pattern']">
+                  请输入有效的手机号码
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <button 
+              type="submit" 
+              class="btn btn-primary w-100"
+              [disabled]="loading">
+              <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
+              {{ loading ? '注册中...' : '注册' }}
+            </button>
+          </div>
+          
+          <div *ngIf="error" class="alert alert-danger">
+            {{ error }}
+          </div>
+          
+          <div class="text-center">
+            <a routerLink="/login">已有账号？立即登录</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,153 @@
+<div class="container mt-4" *ngIf="!loading">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h4 class="mb-0">询价单详情</h4>
+      <button *ngIf="canEdit() && !editMode" class="btn btn-outline-primary btn-sm" (click)="toggleEditMode()">
+        编辑
+      </button>
+    </div>
+    
+    <div class="card-body">
+      <!-- 错误信息 -->
+      <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+      
+      <!-- 询价单详情 -->
+      <div *ngIf="quote" class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">标题:</label>
+            <div *ngIf="!editMode" class="form-control-plaintext">{{ quote.title }}</div>
+            <input *ngIf="editMode" type="text" class="form-control" [(ngModel)]="quoteForm.title">
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold">描述:</label>
+            <div *ngIf="!editMode" class="form-control-plaintext">{{ quote.description }}</div>
+            <textarea *ngIf="editMode" class="form-control" rows="3" [(ngModel)]="quoteForm.description"></textarea>
+          </div>
+          
+          <div class="mb-3" *ngIf="quote.rejectReason">
+            <label class="form-label fw-bold">不予报价理由:</label>
+            <div class="alert alert-warning">{{ quote.rejectReason }}</div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold">状态:</label>
+            <span class="badge" [ngClass]="{
+              'bg-secondary': quote.status === 'pending',
+              'bg-warning': quote.status === 'in_progress',
+              'bg-success': quote.status === 'completed',
+              'bg-danger': quote.status === 'cancelled',
+              'bg-dark': quote.status === 'rejected'
+            }">
+              {{ getStatusDisplayName(quote.status) }}
+            </span>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">客户:</label>
+            <div class="form-control-plaintext">{{ quote.customer.name }} ({{ quote.customer.email }})</div>
+          </div>
+          
+          <div class="mb-3" *ngIf="quote.quoter">
+            <label class="form-label fw-bold">报价员:</label>
+            <div class="form-control-plaintext">{{ quote.quoter.name }} ({{ quote.quoter.email }})</div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold">创建时间:</label>
+            <div class="form-control-plaintext">{{ quote.createdAt | date:'yyyy-MM-dd HH:mm' }}</div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold">更新时间:</label>
+            <div class="form-control-plaintext">{{ quote.updatedAt | date:'yyyy-MM-dd HH:mm' }}</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 文件操作 -->
+      <div *ngIf="quote" class="mt-4">
+        <h5>文件操作</h5>
+        
+        <!-- 客户用户 -->
+        <div *ngIf="authService.hasRole('customer')" class="btn-group">
+          <button class="btn btn-outline-primary" (click)="downloadFile('customer')" [disabled]="!quote.customerFile">
+            {{ quote.status === 'completed' ? '下载报价文件' : '下载原始文件' }}
+          </button>
+        </div>
+        
+        <!-- 报价员和管理员 -->
+        <div *ngIf="authService.hasRole('quoter') || authService.hasRole('admin')">
+          <div class="btn-group mb-2">
+            <button class="btn btn-outline-primary" (click)="downloadFile('customer')" [disabled]="!quote.customerFile">
+              下载原始文件
+            </button>
+          </div>
+          
+          <!-- 报价文件操作 -->
+          <div *ngIf="quote.quoterFile && quote.quoterFile !== null">
+            <div class="btn-group">
+              <button class="btn btn-outline-success" (click)="downloadFile('quoter')">
+                下载报价文件
+              </button>
+              <button class="btn btn-outline-danger" (click)="deleteQuoterFile()">
+                删除报价文件
+              </button>
+            </div>
+          </div>
+          
+          <!-- 上传报价文件 -->
+          <div *ngIf="!quote.quoterFile || quote.quoterFile === null">
+            <div class="btn-group">
+              <label class="btn btn-outline-success">
+                上传报价文件
+                <input type="file" accept=".xlsx,.xls" (change)="onFileSelected($event)" style="display: none;">
+              </label>
+              <button *ngIf="canReject()" class="btn btn-outline-danger" (click)="rejectQuote()">
+                不予报价
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 分配报价员 (仅管理员可见) -->
+      <div *ngIf="quote && authService.hasRole('admin') && quoters.length > 0" class="mt-4">
+        <h5>分配报价员</h5>
+        <div class="row">
+          <div class="col-md-6">
+            <select class="form-select" #quoterSelect>
+              <option value="">选择报价员</option>
+              <option *ngFor="let quoter of quoters" [value]="quoter._id">
+                {{ quoter.name }} ({{ quoter.email }})
+              </option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <button class="btn btn-primary" (click)="assignToQuoter(quoterSelect.value)" [disabled]="!quoterSelect.value">
+              分配
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 编辑模式按钮 -->
+      <div *ngIf="editMode" class="mt-4">
+        <button class="btn btn-success me-2" (click)="saveChanges()">保存</button>
+        <button class="btn btn-secondary" (click)="toggleEditMode()">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 加载中状态 -->
+<div *ngIf="loading" class="container mt-4">
+  <div class="d-flex justify-content-center">
+    <div class="spinner-border" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,81 @@
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="mb-0">创建询价单</h3>
+        </div>
+        <div class="card-body">
+          <form [formGroup]="quoteForm" (ngSubmit)="onSubmit()">
+            <div class="mb-3">
+              <label for="title" class="form-label">询价标题 *</label>
+              <input 
+                type="text" 
+                class="form-control" 
+                id="title"
+                formControlName="title"
+                placeholder="请输入询价单标题"
+                [class.is-invalid]="quoteForm.get('title')?.invalid && quoteForm.get('title')?.touched">
+              <div class="invalid-feedback" *ngIf="quoteForm.get('title')?.errors?.['required']">
+                请输入询价标题
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="description" class="form-label">询价描述</label>
+              <textarea 
+                class="form-control" 
+                id="description"
+                formControlName="description"
+                rows="3"
+                placeholder="请输入询价单的详细描述（可选）"></textarea>
+            </div>
+
+            <div class="mb-3">
+              <label for="customerFile" class="form-label">Excel文件 *</label>
+              <input 
+                type="file" 
+                class="form-control" 
+                id="customerFile"
+                accept=".xlsx,.xls"
+                (change)="onFileSelected($event)"
+                [class.is-invalid]="!selectedFile && quoteForm.get('title')?.touched">
+              <div class="form-text">
+                请上传Excel文件 (.xlsx 或 .xls)，文件大小不超过10MB
+              </div>
+              <div *ngIf="selectedFile" class="mt-2">
+                <span class="badge bg-success">{{ selectedFile.name }}</span>
+                <span class="text-muted ms-2">({{ (selectedFile.size / 1024 / 1024).toFixed(2) }} MB)</span>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="customerMessage" class="form-label">留言给报价员</label>
+              <textarea 
+                class="form-control" 
+                id="customerMessage"
+                formControlName="customerMessage"
+                rows="3"
+                placeholder="请输入给报价员的留言（可选）"></textarea>
+            </div>
+
+            <div class="mb-3">
+              <button 
+                type="submit" 
+                class="btn btn-primary"
+                [disabled]="loading">
+                <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
+                {{ loading ? '创建中...' : '创建询价单' }}
+              </button>
+              <a routerLink="/quotes" class="btn btn-outline-secondary ms-2">取消</a>
+            </div>
+
+            <div *ngIf="error" class="alert alert-danger">
+              {{ error }}
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

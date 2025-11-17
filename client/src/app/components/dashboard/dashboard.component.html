@@ -1,0 +1,107 @@
+<div class="container-fluid py-4">
+  <h1 class="mb-4">仪表板</h1>
+  
+  <!-- 统计卡片 -->
+  <div class="row mb-4">
+    <div class="col-md-3" *ngIf="authService.hasRole('customer')">
+      <div class="card text-white bg-primary">
+        <div class="card-body">
+          <h5 class="card-title">我的询价单</h5>
+          <h2 class="card-text">{{ quotes.length }}</h2>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-3" *ngIf="authService.hasRole('quoter') || authService.hasRole('admin')">
+      <div class="card text-white bg-warning">
+        <div class="card-body">
+          <h5 class="card-title">待处理</h5>
+          <h2 class="card-text">{{ getQuoteCountByStatus('pending') }}</h2>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-3" *ngIf="authService.hasRole('quoter') || authService.hasRole('admin')">
+      <div class="card text-white bg-info">
+        <div class="card-body">
+          <h5 class="card-title">处理中</h5>
+          <h2 class="card-text">{{ getQuoteCountByStatus('in_progress') }}</h2>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-3" *ngIf="authService.hasRole('quoter') || authService.hasRole('admin')">
+      <div class="card text-white bg-danger">
+        <div class="card-body">
+          <h5 class="card-title">不报价</h5>
+          <h2 class="card-text">{{ getQuoteCountByStatus('rejected') }}</h2>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-3">
+      <div class="card text-white bg-success">
+        <div class="card-body">
+          <h5 class="card-title">已完成</h5>
+          <h2 class="card-text">{{ getQuoteCountByStatus('completed') }}</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 最近询价单 -->
+  <div class="card">
+    <div class="card-header">
+      <h5 class="mb-0">最近询价单</h5>
+    </div>
+    <div class="card-body">
+      <div *ngIf="loading" class="loading-spinner">
+        <div class="spinner-border" role="status">
+          <span class="visually-hidden">加载中...</span>
+        </div>
+      </div>
+      
+      <div *ngIf="!loading && quotes.length === 0" class="text-center py-4">
+        <p>暂无询价单</p>
+        <a *ngIf="authService.hasRole('customer')" routerLink="/quotes/create" class="btn btn-primary">
+          创建第一个询价单
+        </a>
+      </div>
+      
+      <div *ngIf="!loading && quotes.length > 0">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>标题</th>
+                <th>客户</th>
+                <th>状态</th>
+                <th>创建时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let quote of getRecentQuotes()">
+                <td>{{ quote.title }}</td>
+                <td>{{ quote.customer.name }}</td>
+                <td>
+                  <span class="status-badge status-{{ quote.status }}">
+                    {{ getStatusDisplayName(quote.status) }}
+                  </span>
+                </td>
+                <td>{{ quote.createdAt | date:'yyyy-MM-dd HH:mm' }}</td>
+                <td>
+                  <a [routerLink]="['/quotes', quote._id]" class="btn btn-sm btn-outline-primary">查看</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="text-center mt-3" *ngIf="quotes.length > 5">
+          <a routerLink="/quotes" class="btn btn-outline-secondary">查看全部</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

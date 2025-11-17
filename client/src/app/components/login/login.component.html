@@ -1,0 +1,59 @@
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-4">
+    <div class="card mt-5">
+      <div class="card-header">
+        <h3 class="text-center mb-0">登录</h3>
+      </div>
+      <div class="card-body">
+        <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+          <div class="mb-3">
+            <label for="email" class="form-label">邮箱</label>
+            <input 
+              type="email" 
+              class="form-control" 
+              id="email"
+              formControlName="email"
+              [class.is-invalid]="loginForm.get('email')?.invalid && loginForm.get('email')?.touched">
+            <div class="invalid-feedback" *ngIf="loginForm.get('email')?.errors?.['required']">
+              请输入邮箱
+            </div>
+            <div class="invalid-feedback" *ngIf="loginForm.get('email')?.errors?.['email']">
+              请输入有效的邮箱地址
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="password" class="form-label">密码</label>
+            <input 
+              type="password" 
+              class="form-control" 
+              id="password"
+              formControlName="password"
+              [class.is-invalid]="loginForm.get('password')?.invalid && loginForm.get('password')?.touched">
+            <div class="invalid-feedback" *ngIf="loginForm.get('password')?.errors?.['required']">
+              请输入密码
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <button 
+              type="submit" 
+              class="btn btn-primary w-100"
+              [disabled]="loading">
+              <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
+              {{ loading ? '登录中...' : '登录' }}
+            </button>
+          </div>
+          
+          <div *ngIf="error" class="alert alert-danger">
+            {{ error }}
+          </div>
+          
+          <div class="text-center">
+            <a routerLink="/register">没有账号？立即注册</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

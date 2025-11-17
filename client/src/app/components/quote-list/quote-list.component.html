@@ -1,0 +1,87 @@
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>询价单管理</h1>
+    <a *ngIf="authService.hasRole('customer')" routerLink="/quotes/create" class="btn btn-primary">
+      创建询价单
+    </a>
+  </div>
+
+  <div *ngIf="loading" class="loading-spinner">
+    <div class="spinner-border" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+  </div>
+
+  <div *ngIf="!loading && error" class="alert alert-danger">
+    {{ error }}
+  </div>
+
+  <div *ngIf="!loading && quotes.length === 0" class="card">
+    <div class="card-body text-center py-5">
+      <h5>暂无询价单</h5>
+      <p class="text-muted">您还没有创建任何询价单</p>
+      <a *ngIf="authService.hasRole('customer')" routerLink="/quotes/create" class="btn btn-primary">
+        创建第一个询价单
+      </a>
+    </div>
+  </div>
+
+  <div *ngIf="!loading && quotes.length > 0" class="card">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>标题</th>
+              <th>客户</th>
+              <th>报价员</th>
+              <th>状态</th>
+              <th>价格</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let quote of quotes">
+              <td>
+                <strong>{{ quote.title }}</strong>
+                <div class="text-muted small">{{ quote.description }}</div>
+              </td>
+              <td>{{ quote.customer.name }}</td>
+              <td>{{ quote.quoter?.name || '-' }}</td>
+              <td>
+                <span class="status-badge status-{{ quote.status }}">
+                  {{ getStatusDisplayName(quote.status) }}
+                </span>
+              </td>
+              <td>
+                <span *ngIf="quote.price">{{ quote.price }} {{ quote.currency }}</span>
+                <span *ngIf="!quote.price" class="text-muted">-</span>
+              </td>
+              <td>{{ quote.createdAt | date:'yyyy-MM-dd HH:mm' }}</td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <a [routerLink]="['/quotes', quote._id]" class="btn btn-outline-primary">查看</a>
+                  <button 
+                    *ngIf="quote.customerFile" 
+                    class="btn btn-outline-secondary"
+                    (click)="downloadFile(quote._id, 'customer')"
+                    title="下载客户文件">
+                    下载
+                  </button>
+                  <button 
+                    *ngIf="quote.quoterFile" 
+                    class="btn btn-outline-success"
+                    (click)="downloadFile(quote._id, 'quoter')"
+                    title="下载报价文件">
+                    报价
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

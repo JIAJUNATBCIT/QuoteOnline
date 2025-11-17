@@ -1,0 +1,143 @@
+<div class="container mt-4">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h4 class="mb-0">个人资料</h4>
+        </div>
+        
+        <div class="card-body">
+          <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="name" class="form-label">姓名</label>
+                  <input type="text" 
+                         class="form-control" 
+                         id="name"
+                         formControlName="name"
+                         [class.is-invalid]="profileForm.get('name')?.invalid && profileForm.get('name')?.touched">
+                  <div class="invalid-feedback" *ngIf="profileForm.get('name')?.errors?.['required']">
+                    姓名是必填项
+                  </div>
+                </div>
+              </div>
+              
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="email" class="form-label">邮箱</label>
+                  <input type="email" 
+                         class="form-control" 
+                         id="email"
+                         formControlName="email"
+                         [class.is-invalid]="profileForm.get('email')?.invalid && profileForm.get('email')?.touched">
+                  <div class="invalid-feedback" *ngIf="profileForm.get('email')?.errors?.['required']">
+                    邮箱是必填项
+                  </div>
+                  <div class="invalid-feedback" *ngIf="profileForm.get('email')?.errors?.['email']">
+                    请输入有效的邮箱地址
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="company" class="form-label">公司名称</label>
+              <input type="text" 
+                     class="form-control" 
+                     id="company"
+                     formControlName="company">
+            </div>
+            
+            <div class="mb-3">
+              <label for="phone" class="form-label">联系电话</label>
+              <input type="tel" 
+                     class="form-control" 
+                     id="phone"
+                     formControlName="phone">
+            </div>
+            
+            <div class="mb-3">
+              <label for="address" class="form-label">地址</label>
+              <textarea class="form-control" 
+                        id="address"
+                        rows="3"
+                        formControlName="address"></textarea>
+            </div>
+            
+            <div class="d-flex justify-content-between">
+              <button type="button" class="btn btn-secondary" routerLink="/quotes">
+                返回
+              </button>
+              <button type="submit" 
+                      class="btn btn-primary"
+                      [disabled]="profileForm.invalid || loading">
+                <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
+                {{ loading ? '保存中...' : '保存' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      
+      <!-- 密码修改部分 -->
+      <div class="card mt-4">
+        <div class="card-header">
+          <h5 class="mb-0">修改密码</h5>
+        </div>
+        
+        <div class="card-body">
+          <form [formGroup]="passwordForm" (ngSubmit)="onPasswordSubmit()">
+            <div class="mb-3">
+              <label for="currentPassword" class="form-label">当前密码</label>
+              <input type="password" 
+                     class="form-control" 
+                     id="currentPassword"
+                     formControlName="currentPassword"
+                     [class.is-invalid]="passwordForm.get('currentPassword')?.invalid && passwordForm.get('currentPassword')?.touched">
+              <div class="invalid-feedback" *ngIf="passwordForm.get('currentPassword')?.errors?.['required']">
+                请输入当前密码
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="newPassword" class="form-label">新密码</label>
+              <input type="password" 
+                     class="form-control" 
+                     id="newPassword"
+                     formControlName="newPassword"
+                     [class.is-invalid]="passwordForm.get('newPassword')?.invalid && passwordForm.get('newPassword')?.touched">
+              <div class="invalid-feedback" *ngIf="passwordForm.get('newPassword')?.errors?.['required']">
+                请输入新密码
+              </div>
+              <div class="invalid-feedback" *ngIf="passwordForm.get('newPassword')?.errors?.['minlength']">
+                密码长度至少6位
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="confirmPassword" class="form-label">确认新密码</label>
+              <input type="password" 
+                     class="form-control" 
+                     id="confirmPassword"
+                     formControlName="confirmPassword"
+                     [class.is-invalid]="passwordForm.invalid && passwordForm.get('confirmPassword')?.touched">
+              <div class="invalid-feedback" *ngIf="passwordForm.errors?.['passwordMismatch']">
+                两次输入的密码不一致
+              </div>
+            </div>
+            
+            <div class="d-flex justify-content-end">
+              <button type="submit" 
+                      class="btn btn-warning"
+                      [disabled]="passwordForm.invalid || loading">
+                <span *ngIf="loading" class="spinner-border spinner-border-sm me-2"></span>
+                {{ loading ? '修改中...' : '修改密码' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
