@@ -8,7 +8,11 @@
     "server": "nodemon server.js",
     "client": "cd client && ng serve",
     "build": "cd client && ng build",
-    "install-all": "npm install && cd client && npm install"
+    "install-all": "npm install && cd client && npm install",
+    "logs": "node scripts/view-logs.js",
+    "logs:error": "node scripts/view-logs.js --error",
+    "logs:tail": "node scripts/view-logs.js --tail",
+    "logs:today": "node scripts/view-logs.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

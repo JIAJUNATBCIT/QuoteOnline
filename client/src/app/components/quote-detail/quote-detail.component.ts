@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { QuoteService, Quote } from '../../services/quote.service';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-quote-detail',
@@ -16,10 +17,11 @@ export class QuoteDetailComponent implements OnInit {
   quoters: any[] = [];
   editMode = false;
   quoteForm: any = {};
+  uploading = false;
+  uploadProgress = 0;
 
   constructor(
     private route: ActivatedRoute,
-    private router: Router,
     private quoteService: QuoteService,
     public authService: AuthService,
     private userService: UserService
@@ -43,7 +45,7 @@ export class QuoteDetailComponent implements OnInit {
         this.quoteForm = { ...quote };
         this.loading = false;
       },
-      error: (error) => {
+      error: () => {
         this.error = '加载询价单失败';
         this.loading = false;
       }
@@ -126,19 +128,70 @@ export class QuoteDetailComponent implements OnInit {
   uploadQuoterFile(file: File) {
     if (!this.quote) return;
     
+    this.uploading = true;
+    this.uploadProgress = 0;
+    
     const formData = new FormData();
     formData.append('quoterFile', file);
     
-    this.quoteService.updateQuote(this.quote._id, formData).subscribe({
-      next: (quote) => {
-        this.quote = quote;
-        alert('报价文件上传成功');
-      },
-      error: (error) => {
-        console.error('上传报价文件失败:', error);
+    // 创建带进度的HTTP请求
+    const xhr = new XMLHttpRequest();
+    
+    // 监听上传进度
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        this.uploadProgress = Math.round((event.loaded / event.total) * 100);
+      }
+    });
+    
+    // 监听响应
+    xhr.addEventListener('load', () => {
+      this.uploading = false;
+      this.uploadProgress = 0;
+      
+      if (xhr.status === 200) {
+        try {
+          const updatedQuote = JSON.parse(xhr.responseText);
+          this.quote = updatedQuote;
+          alert('报价文件上传成功');
+        } catch (error) {
+          console.error('解析响应失败:', error);
+          alert('上传响应解析失败');
+        }
+      } else {
+        console.error('上传失败:', xhr.status, xhr.responseText);
         alert('上传报价文件失败');
       }
     });
+    
+    // 监听错误
+    xhr.addEventListener('error', () => {
+      this.uploading = false;
+      this.uploadProgress = 0;
+      console.error('网络错误');
+      alert('网络错误，上传失败');
+    });
+    
+    // 监听超时
+    xhr.addEventListener('timeout', () => {
+      this.uploading = false;
+      this.uploadProgress = 0;
+      console.error('上传超时');
+      alert('上传超时，请重试');
+    });
+    
+    // 配置请求
+    xhr.timeout = 60000; // 60秒超时
+    xhr.open('PUT', `${environment.apiUrl}/quotes/${this.quote._id}`);
+    
+    // 添加认证头
+    const token = localStorage.getItem('token');
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+    
+    // 发送请求
+    xhr.send(formData);
   }
 
   deleteQuoterFile() {

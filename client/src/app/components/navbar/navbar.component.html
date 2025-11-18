@@ -11,9 +11,7 @@
         <li class="nav-item">
           <a class="nav-link" routerLink="/dashboard" routerLinkActive="active">仪表板</a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link" routerLink="/quotes" routerLinkActive="active">询价单</a>
-        </li>
+
         <li class="nav-item" *ngIf="authService.hasRole('customer')">
           <a class="nav-link" routerLink="/quotes/create" routerLinkActive="active">创建询价</a>
         </li>

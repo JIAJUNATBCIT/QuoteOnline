@@ -2,7 +2,7 @@
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
       <h4 class="mb-0">询价单详情</h4>
-      <button *ngIf="canEdit() && !editMode" class="btn btn-outline-primary btn-sm" (click)="toggleEditMode()">
+      <button *ngIf="canEdit() && !editMode" class="btn btn-outline-primary btn-sm" (click)="toggleEditMode()" [disabled]="uploading">
         编辑
       </button>
     </div>
@@ -14,6 +14,11 @@
       <!-- 询价单详情 -->
       <div *ngIf="quote" class="row">
         <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label fw-bold">询价号:</label>
+            <div class="form-control-plaintext text-primary fw-bold">{{ quote.quoteNumber }}</div>
+          </div>
+          
           <div class="mb-3">
             <label class="form-label fw-bold">标题:</label>
             <div *ngIf="!editMode" class="form-control-plaintext">{{ quote.title }}</div>
@@ -46,12 +51,12 @@
         </div>
         
         <div class="col-md-6">
-          <div class="mb-3">
+          <div class="mb-3" *ngIf="authService.hasRole('customer') || authService.hasRole('admin')">
             <label class="form-label fw-bold">客户:</label>
             <div class="form-control-plaintext">{{ quote.customer.name }} ({{ quote.customer.email }})</div>
           </div>
           
-          <div class="mb-3" *ngIf="quote.quoter">
+          <div class="mb-3" *ngIf="quote.quoter && (authService.hasRole('quoter') || authService.hasRole('admin'))">
             <label class="form-label fw-bold">报价员:</label>
             <div class="form-control-plaintext">{{ quote.quoter.name }} ({{ quote.quoter.email }})</div>
           </div>
@@ -82,7 +87,7 @@
         <!-- 报价员和管理员 -->
         <div *ngIf="authService.hasRole('quoter') || authService.hasRole('admin')">
           <div class="btn-group mb-2">
-            <button class="btn btn-outline-primary" (click)="downloadFile('customer')" [disabled]="!quote.customerFile">
+            <button class="btn btn-outline-primary" (click)="downloadFile('customer')" [disabled]="!quote.customerFile || uploading">
               下载原始文件
             </button>
           </div>
@@ -90,10 +95,10 @@
           <!-- 报价文件操作 -->
           <div *ngIf="quote.quoterFile && quote.quoterFile !== null">
             <div class="btn-group">
-              <button class="btn btn-outline-success" (click)="downloadFile('quoter')">
+              <button class="btn btn-outline-success" (click)="downloadFile('quoter')" [disabled]="uploading">
                 下载报价文件
               </button>
-              <button class="btn btn-outline-danger" (click)="deleteQuoterFile()">
+              <button class="btn btn-outline-danger" (click)="deleteQuoterFile()" [disabled]="uploading">
                 删除报价文件
               </button>
             </div>
@@ -101,12 +106,23 @@
           
           <!-- 上传报价文件 -->
           <div *ngIf="!quote.quoterFile || quote.quoterFile === null">
-            <div class="btn-group">
+            <!-- 上传中状态 -->
+            <div *ngIf="uploading" class="upload-status text-center">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">上传中...</span>
+              </div>
+              <div class="upload-text">
+                正在上传报价文件，请稍候...
+              </div>
+            </div>
+            
+            <!-- 上传按钮 -->
+            <div *ngIf="!uploading" class="btn-group">
               <label class="btn btn-outline-success">
                 上传报价文件
-                <input type="file" accept=".xlsx,.xls" (change)="onFileSelected($event)" style="display: none;">
+                <input type="file" accept=".xlsx,.xls" (change)="onFileSelected($event)" [disabled]="uploading" style="display: none;">
               </label>
-              <button *ngIf="canReject()" class="btn btn-outline-danger" (click)="rejectQuote()">
+              <button *ngIf="canReject()" class="btn btn-outline-danger" (click)="rejectQuote()" [disabled]="uploading">
                 不予报价
               </button>
             </div>
@@ -127,7 +143,7 @@
             </select>
           </div>
           <div class="col-md-6">
-            <button class="btn btn-primary" (click)="assignToQuoter(quoterSelect.value)" [disabled]="!quoterSelect.value">
+            <button class="btn btn-primary" (click)="assignToQuoter(quoterSelect.value)" [disabled]="!quoterSelect.value || uploading">
               分配
             </button>
           </div>
@@ -136,8 +152,8 @@
       
       <!-- 编辑模式按钮 -->
       <div *ngIf="editMode" class="mt-4">
-        <button class="btn btn-success me-2" (click)="saveChanges()">保存</button>
-        <button class="btn btn-secondary" (click)="toggleEditMode()">取消</button>
+        <button class="btn btn-success me-2" (click)="saveChanges()" [disabled]="uploading">保存</button>
+        <button class="btn btn-secondary" (click)="toggleEditMode()" [disabled]="uploading">取消</button>
       </div>
     </div>
   </div>

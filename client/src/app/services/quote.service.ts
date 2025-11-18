@@ -12,6 +12,7 @@ export interface QuoteFile {
 
 export interface Quote {
   _id: string;
+  quoteNumber: string;
   customer: any;
   quoter?: any;
   title: string;
@@ -63,5 +64,9 @@ export class QuoteService {
     return this.http.get(`${environment.apiUrl}/quotes/${quoteId}/download/${fileType}`, {
       responseType: 'blob'
     });
+  }
+
+  deleteQuote(id: string): Observable<void> {
+    return this.http.delete<void>(`${environment.apiUrl}/quotes/${id}`);
   }
 }

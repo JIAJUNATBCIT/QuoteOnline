@@ -36,6 +36,20 @@
   height: 3rem;
 }
 
+.upload-status {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  
+  .upload-text {
+    color: #6c757d;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+  }
+}
+
 .alert {
   border-radius: 8px;
 }

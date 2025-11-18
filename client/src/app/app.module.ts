@@ -8,7 +8,7 @@ import { AppComponent } from './app.component';
 import { LoginComponent } from './components/login/login.component';
 import { RegisterComponent } from './components/register/register.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
-import { QuoteListComponent } from './components/quote-list/quote-list.component';
+
 import { QuoteCreateComponent } from './components/quote-create/quote-create.component';
 import { QuoteDetailComponent } from './components/quote-detail/quote-detail.component';
 import { UserListComponent } from './components/user-list/user-list.component';
@@ -22,7 +22,7 @@ import { NavbarComponent } from './components/navbar/navbar.component';
     LoginComponent,
     RegisterComponent,
     DashboardComponent,
-    QuoteListComponent,
+
     QuoteCreateComponent,
     QuoteDetailComponent,
     UserListComponent,

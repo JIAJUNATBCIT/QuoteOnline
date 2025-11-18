@@ -3,7 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { LoginComponent } from './components/login/login.component';
 import { RegisterComponent } from './components/register/register.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
-import { QuoteListComponent } from './components/quote-list/quote-list.component';
+
 import { QuoteCreateComponent } from './components/quote-create/quote-create.component';
 import { QuoteDetailComponent } from './components/quote-detail/quote-detail.component';
 import { UserListComponent } from './components/user-list/user-list.component';
@@ -20,11 +20,7 @@ const routes: Routes = [
     component: DashboardComponent,
     canActivate: [AuthGuard]
   },
-  { 
-    path: 'quotes', 
-    component: QuoteListComponent,
-    canActivate: [AuthGuard]
-  },
+
   { 
     path: 'quotes/create', 
     component: QuoteCreateComponent,
