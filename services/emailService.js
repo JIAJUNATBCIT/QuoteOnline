@@ -1059,10 +1059,13 @@ const sendPasswordReset = async (email, resetToken) => {
     const startTime = Date.now();
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
     
+    console.log('发送密码重置邮件到:', email);
+    console.log('重置链接:', resetUrl);
+    
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: '密码重置请求',
+      subject: '密码重置请求 - 询价系统',
       html: EmailTemplates.passwordReset(resetUrl)
     };
 
@@ -1076,12 +1079,15 @@ const sendPasswordReset = async (email, resetToken) => {
       duration: endTime - startTime
     });
     
+    console.log('邮件发送成功, Message ID:', result.messageId);
+    
     return result;
   } catch (error) {
     logger.error('发送密码重置邮件失败', {
       to: email,
       error: error.message
     });
+    console.error('发送密码重置邮件失败:', error);
     throw new Error(`密码重置邮件发送失败: ${error.message}`);
   }
 };

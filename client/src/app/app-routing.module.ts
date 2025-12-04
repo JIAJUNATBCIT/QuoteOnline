@@ -9,6 +9,8 @@ import { QuoteDetailComponent } from './components/quote-detail/quote-detail.com
 import { UserListComponent } from './components/user-list/user-list.component';
 import { UserProfileComponent } from './components/user-profile/user-profile.component';
 import { QuoteRedirectComponent } from './components/quote-redirect/quote-redirect.component';
+import { ForgotPasswordComponent } from './components/forgot-password/forgot-password.component';
+import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
 import { AuthGuard } from './guards/auth.guard';
 import { RoleGuard } from './guards/role.guard';
 
@@ -16,6 +18,8 @@ const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
+  { path: 'forgot-password', component: ForgotPasswordComponent },
+  { path: 'reset-password', component: ResetPasswordComponent },
   { 
     path: 'quote-view/:id', 
     component: QuoteRedirectComponent

@@ -182,40 +182,23 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(404).json({ message: '用户不存在' });
     }
 
-    // Generate reset token (简化实现，实际应发送邮件)
+    // Generate reset token
     const resetToken = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    // 这里应该发送包含resetToken的邮件给用户
-    // 简化实现，直接返回token
+    // Send password reset email
+    const emailService = require('../services/emailService');
+    await emailService.sendPasswordReset(email, resetToken);
+
     res.json({ 
-      message: '密码重置链接已发送到您的邮箱',
-      resetToken 
+      message: '密码重置链接已发送到您的邮箱'
     });
   } catch (error) {
-    // Handle Mongoose validation errors
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ 
-        message: '请填写所有必填字段', 
-        errors: errors 
-      });
-    }
-    
-    // Handle duplicate key error
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyValue)[0];
-      return res.status(400).json({ 
-        message: `${field === 'email' ? '邮箱' : field}已存在` 
-      });
-    }
-    
-    // Handle other errors
-    console.error('Registration error:', error);
-    res.status(500).json({ message: '服务器错误', error: process.env.NODE_ENV === 'development' ? error.message : '请稍后重试' });
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: '发送重置邮件失败', error: error.message });
   }
 });
 

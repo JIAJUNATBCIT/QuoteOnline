@@ -68,4 +68,15 @@ export class LoginComponent implements OnInit {
       }
     });
   }
+
+  showForgotPassword() {
+    const email = this.loginForm.get('email')?.value;
+    if (email) {
+      // 如果用户已经输入了邮箱，直接跳转到重置密码页面并预填邮箱
+      this.router.navigate(['/forgot-password'], { queryParams: { email } });
+    } else {
+      // 否则跳转到重置密码页面
+      this.router.navigate(['/forgot-password']);
+    }
+  }
 }

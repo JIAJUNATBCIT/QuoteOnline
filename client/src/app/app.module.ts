@@ -16,6 +16,8 @@ import { QuoteDetailComponent } from './components/quote-detail/quote-detail.com
 import { UserListComponent } from './components/user-list/user-list.component';
 import { UserProfileComponent } from './components/user-profile/user-profile.component';
 import { QuoteRedirectComponent } from './components/quote-redirect/quote-redirect.component';
+import { ForgotPasswordComponent } from './components/forgot-password/forgot-password.component';
+import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
 import { AuthInterceptor } from './interceptors/auth.interceptor';
 import { NavbarComponent } from './components/navbar/navbar.component';
 
@@ -33,9 +35,9 @@ import { NavbarComponent } from './components/navbar/navbar.component';
     UserListComponent,
     UserProfileComponent,
     QuoteRedirectComponent,
+    ForgotPasswordComponent,
+    ResetPasswordComponent,
     NavbarComponent,
-
-
   ],
   imports: [
     BrowserModule,
