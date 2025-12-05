@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 client/node_modules/
+client/.angular/
+.angular/
+
 
 # Production builds
 client/dist/
