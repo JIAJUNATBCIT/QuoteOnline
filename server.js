@@ -89,6 +89,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/quoteonli
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/quotes', require('./routes/quotes'));
+app.use('/api/groups', require('./routes/groups'));
 
 // Serve Angular app in production
 if (process.env.NODE_ENV === 'production') {

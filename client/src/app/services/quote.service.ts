@@ -17,6 +17,7 @@ export interface Quote {
   customer: any;
   quoter?: any;
   supplier?: any;
+  assignedGroups?: any[];
   title: string;
   description?: string;
   customerFiles?: QuoteFile[];
@@ -101,5 +102,14 @@ export class QuoteService {
 
   confirmFinalQuote(id: string): Observable<Quote> {
     return this.http.patch<Quote>(`${environment.apiUrl}/quotes/${id}/confirm-final-quote`, {});
+  }
+
+  // 群组分配相关方法
+  assignGroupsToQuote(id: string, groupIds: string[]): Observable<Quote> {
+    return this.http.patch<Quote>(`${environment.apiUrl}/quotes/${id}/assign-groups`, { groupIds });
+  }
+
+  removeGroupAssignment(id: string, groupId: string): Observable<Quote> {
+    return this.http.delete<Quote>(`${environment.apiUrl}/quotes/${id}/groups/${groupId}`);
   }
 }

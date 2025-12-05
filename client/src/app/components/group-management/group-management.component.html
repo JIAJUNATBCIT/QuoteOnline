@@ -1,0 +1,185 @@
+<div class="group-management">
+  <div class="header">
+    <h2>群组管理</h2>
+    <button class="btn btn-primary" (click)="openCreateModal()" *ngIf="authService.hasRole(['admin', 'quoter'])">
+      <i class="bi bi-plus"></i> 创建群组
+    </button>
+  </div>
+
+  <!-- 加载状态 -->
+  <div *ngIf="loading" class="loading">
+    <i class="bi bi-arrow-repeat spin-icon"></i> 加载中...
+  </div>
+
+  <!-- 错误信息 -->
+  <div *ngIf="error" class="alert alert-danger">
+    {{ error }}
+  </div>
+
+  <!-- 群组列表 -->
+  <div *ngIf="!loading" class="groups-container">
+    <div class="group-card" *ngFor="let group of groups">
+      <div class="group-header" [style.borderColor]="group.color">
+        <div class="group-info">
+          <h3 [style.color]="group.color">{{ group.name }}</h3>
+          <span class="status-badge" [class.active]="group.isActive" [class.inactive]="!group.isActive">
+            {{ group.isActive ? '启用' : '禁用' }}
+          </span>
+        </div>
+        <div class="group-actions" *ngIf="authService.hasRole(['admin', 'quoter'])">
+          <button class="btn btn-sm btn-outline-primary" (click)="openEditModal(group)" title="编辑群组">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-info" (click)="openAssignModal(group)" title="分配成员">
+            <i class="bi bi-people"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger" (click)="deleteGroup(group)" title="删除群组">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="group-body">
+        <p *ngIf="group.description" class="description">{{ group.description }}</p>
+        
+        <div class="group-meta">
+          <small>
+            <i class="bi bi-person"></i> 创建者: {{ group.createdBy.name }}
+          </small>
+          <small>
+            <i class="bi bi-calendar"></i> 创建时间: {{ group.createdAt | date:'yyyy-MM-dd HH:mm' }}
+          </small>
+        </div>
+
+        <div class="users-section" *ngIf="group.users && group.users.length > 0">
+          <h4>群组成员 ({{ group.users.length }})</h4>
+          <div class="users-grid">
+            <div class="user-item" *ngFor="let user of group.users">
+              <i class="bi bi-person-circle"></i>
+              <div class="user-info">
+                <span class="user-name">{{ user.name }}</span>
+                <span class="user-email">{{ user.email }}</span>
+                <span class="user-company" *ngIf="user.company">{{ user.company }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空状态 -->
+  <div *ngIf="!loading && groups.length === 0" class="empty-state">
+    <i class="bi bi-people"></i>
+    <h3>暂无群组</h3>
+    <p *ngIf="authService.hasRole(['admin', 'quoter'])">点击上方按钮创建第一个群组</p>
+  </div>
+</div>
+
+<!-- 创建群组模态框 -->
+<div *ngIf="showCreateModal" class="modal-overlay" (click)="closeCreateModal()">
+  <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 5px solid #28a745; border-radius: 8px; padding: 20px; min-width: 400px; z-index: 99999;" (click)="$event.stopPropagation()">
+    <h3>创建群组</h3>
+    
+    <form (ngSubmit)="createGroup()">
+      <div>
+        <label>群组名称 *:</label><br>
+        <input 
+          type="text" 
+          [(ngModel)]="groupForm.name" 
+          name="name" 
+          required
+          placeholder="请输入群组名称"
+          style="width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px;"><br>
+      </div>
+      
+      <div>
+        <label>群组描述:</label><br>
+        <textarea 
+          [(ngModel)]="groupForm.description" 
+          name="description"
+          rows="3"
+          placeholder="请输入群组描述"
+          style="width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px;"></textarea><br>
+      </div>
+      
+      <div>
+        <label>群组颜色:</label><br>
+        <input 
+          type="color" 
+          [(ngModel)]="groupForm.color" 
+          name="color"
+          style="width: 100%; margin: 8px 0;"><br>
+      </div>
+      
+      <div style="text-align: right; border-top: 1px solid #eee; padding-top: 16px;">
+        <button type="button" (click)="closeCreateModal()" style="background: #6c757d; color: white; border: none; padding: 8px 16px; margin-right: 8px; border-radius: 4px;">取消</button>
+        <button type="submit" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px;">创建群组</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 编辑群组模态框 -->
+<div *ngIf="showEditModal" class="modal-overlay" (click)="closeEditModal()">
+  <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 5px solid #007bff; border-radius: 8px; padding: 20px; min-width: 400px; z-index: 99999;" (click)="$event.stopPropagation()">
+    <h3>编辑群组</h3>
+    <p>群组名称: {{ editForm.name }}</p>
+    <label>群组名称 *:</label><br>
+    <input type="text" [(ngModel)]="editForm.name" name="name" style="width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px;"><br>
+    
+    <label>群组描述:</label><br>
+    <textarea [(ngModel)]="editForm.description" name="description" rows="3" style="width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px;"></textarea><br>
+    
+    <label>群组颜色:</label><br>
+    <input type="color" [(ngModel)]="editForm.color" name="color" style="width: 100%; margin: 8px 0;"><br>
+    
+    <label>
+      <input type="checkbox" [(ngModel)]="editForm.isActive" name="isActive"> 启用群组
+    </label><br><br>
+    
+    <button type="button" (click)="closeEditModal()" style="background: #6c757d; color: white; border: none; padding: 8px 16px; margin-right: 8px; border-radius: 4px;">取消</button>
+    <button type="button" (click)="updateGroup()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px;">保存修改</button>
+  </div>
+</div>
+
+<!-- 分配用户模态框 -->
+<div *ngIf="showAssignModal" class="modal-overlay" (click)="closeAssignModal()">
+  <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 5px solid #17a2b8; border-radius: 8px; padding: 20px; min-width: 600px; max-width: 800px; max-height: 80vh; overflow-y: auto; z-index: 99999;" (click)="$event.stopPropagation()">
+    <h3>分配供应商到群组: {{ selectedGroup?.name }}</h3>
+    
+    <div style="margin-bottom: 16px;">
+      <input 
+        type="text" 
+        placeholder="搜索供应商..."
+        #searchInput
+        style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+    </div>
+    
+    <div style="max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; margin-bottom: 16px;">
+      <div *ngFor="let supplier of suppliers" style="padding: 12px; border-bottom: 1px solid #eee;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+          <input 
+            type="checkbox" 
+            [value]="supplier._id"
+            [checked]="selectedSuppliers.includes(supplier._id)"
+            (change)="onSupplierSelectionChange($event)">
+          <div>
+            <div style="font-weight: 500;">{{ supplier.name }}</div>
+            <div style="color: #666; font-size: 12px;">{{ supplier.email }}</div>
+            <div style="color: #888; font-size: 12px;" *ngIf="supplier.company">{{ supplier.company }}</div>
+          </div>
+        </label>
+      </div>
+    </div>
+    
+    <div style="text-align: center; margin-bottom: 16px; font-weight: 500; color: #007bff;">
+      已选择 {{ selectedSuppliers.length }} 个供应商
+    </div>
+    
+    <div style="text-align: right; border-top: 1px solid #eee; padding-top: 16px;">
+      <button type="button" (click)="closeAssignModal()" style="background: #6c757d; color: white; border: none; padding: 8px 16px; margin-right: 8px; border-radius: 4px;">取消</button>
+      <button type="button" (click)="assignUsersToGroup()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px;">确认分配</button>
+    </div>
+  </div>
+</div>

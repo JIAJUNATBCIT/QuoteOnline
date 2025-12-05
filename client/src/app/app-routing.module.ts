@@ -11,6 +11,7 @@ import { UserProfileComponent } from './components/user-profile/user-profile.com
 import { QuoteRedirectComponent } from './components/quote-redirect/quote-redirect.component';
 import { ForgotPasswordComponent } from './components/forgot-password/forgot-password.component';
 import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
+import { GroupManagementComponent } from './components/group-management/group-management.component';
 import { AuthGuard } from './guards/auth.guard';
 import { RoleGuard } from './guards/role.guard';
 
@@ -45,6 +46,12 @@ const routes: Routes = [
     component: UserListComponent,
     canActivate: [AuthGuard, RoleGuard],
     data: { roles: ['admin'] }
+  },
+  { 
+    path: 'groups', 
+    component: GroupManagementComponent,
+    canActivate: [AuthGuard, RoleGuard],
+    data: { roles: ['admin', 'quoter'] }
   },
   { 
     path: 'profile', 

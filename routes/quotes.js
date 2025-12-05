@@ -5,6 +5,7 @@ const fs = require('fs');
 const archiver = require('archiver');
 const Quote = require('../models/Quote');
 const User = require('../models/User');
+const Group = require('../models/Group');
 const { auth, authorize } = require('../middleware/auth');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
@@ -249,13 +250,29 @@ router.get('/', auth, async (req, res) => {
     switch (req.user.role) {
       case 'customer':
         query = { customer: req.user.userId };
-        populates = [{ path: 'customer', select: 'name email company' }];
-        break;
-      case 'supplier':
-        query = { supplier: req.user.userId }; // 只显示分配给自己的询价单
         populates = [
           { path: 'customer', select: 'name email company' },
-          { path: 'supplier', select: 'name email company' }
+          { path: 'assignedGroups', select: 'name description color' }
+        ];
+        break;
+      case 'supplier':
+        // 获取供应商所在的群组
+        const supplier = await User.findById(req.user.userId).select('groups');
+        const supplierGroupIds = supplier ? supplier.groups : [];
+        
+        // 供应商可以看到：
+        // 1. 直接分配给自己的询价单
+        // 2. 分配给自己所在群组的询价单
+        query = { 
+          $or: [
+            { supplier: req.user.userId },
+            { assignedGroups: { $in: supplierGroupIds } }
+          ]
+        };
+        populates = [
+          { path: 'customer', select: 'name email company' },
+          { path: 'supplier', select: 'name email company' },
+          { path: 'assignedGroups', select: 'name description color' }
         ];
         break;
       case 'quoter':
@@ -263,7 +280,8 @@ router.get('/', auth, async (req, res) => {
         populates = [
           { path: 'customer', select: 'name email company' },
           { path: 'quoter', select: 'name email company' },
-          { path: 'supplier', select: 'name email company' }
+          { path: 'supplier', select: 'name email company' },
+          { path: 'assignedGroups', select: 'name description color' }
         ];
         break;
     }
@@ -294,7 +312,8 @@ router.get('/:id', auth, async (req, res) => {
     const quote = await Quote.findById(req.params.id)
       .populate('customer', 'name email company')
       .populate('quoter', 'name email company')
-      .populate('supplier', 'name email company');
+      .populate('supplier', 'name email company')
+      .populate('assignedGroups', 'name description color');
 
     if (!quote) {
       return res.status(404).json({ message: '询价单不存在' });
@@ -305,10 +324,27 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(403).json({ message: '权限不足' });
     }
 
-    // 供应商权限检查：只能访问分配给自己的询价单
+    // 供应商权限检查：只能访问分配给自己的询价单或分配给所在群组的询价单
     if (req.user.role === 'supplier') {
-      if (!quote.supplier || quote.supplier._id.toString() !== req.user.userId) {
-        return res.status(403).json({ message: '权限不足：您不是当前分配的供应商' });
+      let hasAccess = false;
+      
+      // 检查是否被个人分配
+      if (quote.supplier && quote.supplier._id.toString() === req.user.userId) {
+        hasAccess = true;
+      }
+      
+      // 检查是否属于已分配的群组
+      if (!hasAccess && quote.assignedGroups && quote.assignedGroups.length > 0) {
+        const user = await User.findById(req.user.userId);
+        if (user && user.groups && user.groups.length > 0) {
+          hasAccess = quote.assignedGroups.some(group => 
+            user.groups.includes(group._id.toString())
+          );
+        }
+      }
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: '权限不足：您不是当前分配的供应商或群组成员' });
       }
       
       // 只有在特定状态下才能访问
@@ -760,6 +796,130 @@ router.patch('/:id/assign-supplier', auth, async (req, res) => {
   }
 });
 
+// Assign quote to groups (quoter or admin only)
+router.patch('/:id/assign-groups', auth, async (req, res) => {
+  try {
+    const { groupIds } = req.body;
+    
+    // 验证权限：只有报价员和管理员可以分配群组
+    if (!['quoter', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ message: '权限不足' });
+    }
+
+    // 验证群组
+    const groups = await Group.find({ 
+      _id: { $in: groupIds },
+      isActive: true 
+    });
+    
+    if (groups.length !== groupIds.length) {
+      return res.status(400).json({ message: '部分群组不存在或已被禁用' });
+    }
+
+    const quote = await Quote.findById(req.params.id);
+    if (!quote) {
+      return res.status(404).json({ message: '询价单不存在' });
+    }
+
+    // 更新询价单
+    const updatedQuote = await Quote.findByIdAndUpdate(
+      req.params.id,
+      { 
+        assignedGroups: groupIds,
+        status: 'in_progress'
+      },
+      { new: true }
+    ).populate('customer', 'name email company')
+     .populate('quoter', 'name email company')
+     .populate('supplier', 'name email company')
+     .populate('assignedGroups', 'name description color');
+
+    // 获取所有属于这些群组的供应商
+    const suppliers = await User.find({
+      groups: { $in: groupIds },
+      role: 'supplier',
+      isActive: true
+    });
+
+    // 异步发送邮件通知所有相关供应商
+    setImmediate(async () => {
+      try {
+        // 创建不包含客户信息的询价单对象用于邮件发送
+        const sanitizedQuote = {
+          _id: updatedQuote._id,
+          quoteNumber: updatedQuote.quoteNumber,
+          title: updatedQuote.title,
+          description: updatedQuote.description,
+          createdAt: updatedQuote.createdAt,
+          customerFiles: updatedQuote.customerFiles
+        };
+
+        // 群发邮件给所有供应商
+        const emailPromises = suppliers.map(supplier => 
+          emailService.sendQuoteNotification(supplier.email, sanitizedQuote)
+        );
+
+        await Promise.all(emailPromises);
+        
+        logger.info(`询价单 ${updatedQuote.quoteNumber} 群组分配邮件发送完成`, { 
+          groupIds: groupIds,
+          supplierCount: suppliers.length,
+          suppliers: suppliers.map(s => s.email)
+        });
+      } catch (error) {
+        logger.error('群组分配邮件发送失败', {
+          error: error.message,
+          quoteId: updatedQuote._id,
+          groupIds: groupIds 
+        });
+      }
+    });
+
+    res.json(updatedQuote);
+  } catch (error) {
+    logger.request(req, Date.now() - (req.startTime || Date.now()), error);
+    res.status(500).json({ message: '服务器错误', error: error.message });
+  }
+});
+
+// Remove single group assignment (quoter or admin only)
+router.delete('/:id/groups/:groupId', auth, async (req, res) => {
+  try {
+    // 验证权限：只有报价员和管理员可以移除群组分配
+    if (!['quoter', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ message: '权限不足' });
+    }
+
+    const quote = await Quote.findById(req.params.id);
+    if (!quote) {
+      return res.status(404).json({ message: '询价单不存在' });
+    }
+
+    // 从分配的群组中移除指定的群组
+    const updatedQuote = await Quote.findByIdAndUpdate(
+      req.params.id,
+      { 
+        $pull: { assignedGroups: req.params.groupId }
+      },
+      { new: true }
+    ).populate('customer', 'name email company')
+     .populate('quoter', 'name email company')
+     .populate('supplier', 'name email company')
+     .populate('assignedGroups', 'name description color');
+
+    // 如果没有分配任何群组了，将状态改回pending
+    if (!updatedQuote.assignedGroups || updatedQuote.assignedGroups.length === 0) {
+      updatedQuote.status = 'pending';
+      await updatedQuote.save();
+    }
+
+    res.json(updatedQuote);
+  } catch (error) {
+    logger.request(req, Date.now() - (req.startTime || Date.now()), error);
+    res.status(500).json({ message: '服务器错误', error: error.message });
+  }
+});
+
 // Remove supplier assignment (quoter or admin only)
 router.patch('/:id/remove-supplier', auth, async (req, res) => {
   try {
@@ -963,9 +1123,19 @@ router.get('/:id/download/:fileType', auth, async (req, res) => {
       if (req.user.role === 'customer') {
         filePath = targetFile.path;
       } else if (req.user.role === 'supplier') {
-        // 供应商必须是当前分配的供应商才能下载客户文件
-        if (!quote.supplier || quote.supplier._id?.toString() !== req.user.userId) {
-          return res.status(403).json({ message: '权限不足：您不是当前分配的供应商' });
+        // 供应商权限检查：
+        // 1. 直接分配给自己的询价单
+        // 2. 分配给自己所在群组的询价单
+        const supplier = await User.findById(req.user.userId).select('groups');
+        const supplierGroupIds = supplier ? supplier.groups : [];
+        
+        const canAccess = (quote.supplier && quote.supplier._id?.toString() === req.user.userId) ||
+                        (quote.assignedGroups && quote.assignedGroups.some(group => 
+                          supplierGroupIds.includes(group._id.toString())
+                        ));
+        
+        if (!canAccess) {
+          return res.status(403).json({ message: '权限不足：您无权访问此询价单的文件' });
         }
         filePath = targetFile.path;
       } else if (req.user.role === 'quoter' || req.user.role === 'admin') {
@@ -983,9 +1153,23 @@ router.get('/:id/download/:fileType', auth, async (req, res) => {
         return res.status(403).json({ message: '权限不足' });
       }
     } else if (fileType === 'supplier') {
-      // 供应商可以下载自己上传的文件，报价员和管理员可以下载所有供应商文件
-      if (req.user.role === 'supplier' && quote.supplier._id?.toString() === req.user.userId) {
-        filePath = targetFile.path;
+      // 供应商文件权限检查：
+      // 1. 自己上传的文件
+      // 2. 同一群组的供应商可以互相查看报价文件
+      if (req.user.role === 'supplier') {
+        const supplier = await User.findById(req.user.userId).select('groups');
+        const supplierGroupIds = supplier ? supplier.groups : [];
+        
+        const canAccess = (quote.supplier && quote.supplier._id?.toString() === req.user.userId) ||
+                        (quote.assignedGroups && quote.assignedGroups.some(group => 
+                          supplierGroupIds.includes(group._id.toString())
+                        ));
+        
+        if (canAccess) {
+          filePath = targetFile.path;
+        } else {
+          return res.status(403).json({ message: '权限不足：您无权访问此供应商文件' });
+        }
       } else if (req.user.role === 'quoter' || req.user.role === 'admin') {
         filePath = targetFile.path;
       } else {
@@ -1029,11 +1213,19 @@ router.get('/:id/download/:fileType/batch', auth, async (req, res) => {
         files = quote.customerFiles || [];
         zipFileName = `${quote.quoteNumber}_customer_files.zip`;
         
-        // 客户可以下载自己的文件，供应商只能下载分配给自己的询价单
+        // 客户可以下载自己的文件，供应商可以下载分配给自己或群组的询价单
         if (req.user.role !== 'customer') {
           if (req.user.role === 'supplier') {
-            if (!quote.supplier || quote.supplier._id.toString() !== req.user.userId) {
-              return res.status(403).json({ message: '权限不足：您不是当前分配的供应商' });
+            const supplier = await User.findById(req.user.userId).select('groups');
+            const supplierGroupIds = supplier ? supplier.groups : [];
+            
+            const canAccess = (quote.supplier && quote.supplier._id?.toString() === req.user.userId) ||
+                            (quote.assignedGroups && quote.assignedGroups.some(group => 
+                              supplierGroupIds.includes(group._id.toString())
+                            ));
+            
+            if (!canAccess) {
+              return res.status(403).json({ message: '权限不足：您无权访问此询价单的文件' });
             }
           } else if (req.user.role !== 'quoter' && req.user.role !== 'admin') {
             return res.status(403).json({ message: '权限不足' });
@@ -1044,11 +1236,20 @@ router.get('/:id/download/:fileType/batch', auth, async (req, res) => {
         files = quote.supplierFiles || [];
         zipFileName = `${quote.quoteNumber}_supplier_files.zip`;
         
-        // 供应商可以下载自己上传的文件，报价员和管理员可以下载所有供应商文件
-        if (req.user.role !== 'supplier' && req.user.role !== 'quoter' && req.user.role !== 'admin') {
-          return res.status(403).json({ message: '权限不足' });
-        }
-        if (req.user.role === 'supplier' && quote.supplier._id?.toString() !== req.user.userId) {
+        // 供应商可以下载自己或同群组供应商上传的文件，报价员和管理员可以下载所有供应商文件
+        if (req.user.role === 'supplier') {
+          const supplier = await User.findById(req.user.userId).select('groups');
+          const supplierGroupIds = supplier ? supplier.groups : [];
+          
+          const canAccess = (quote.supplier && quote.supplier._id?.toString() === req.user.userId) ||
+                          (quote.assignedGroups && quote.assignedGroups.some(group => 
+                            supplierGroupIds.includes(group._id.toString())
+                          ));
+          
+          if (!canAccess) {
+            return res.status(403).json({ message: '权限不足：您无权访问此供应商文件' });
+          }
+        } else if (req.user.role !== 'quoter' && req.user.role !== 'admin') {
           return res.status(403).json({ message: '权限不足' });
         }
         break;

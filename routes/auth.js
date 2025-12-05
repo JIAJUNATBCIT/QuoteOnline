@@ -13,7 +13,7 @@ const router = express.Router();
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, name, company, phone } = req.body;
+    const { email, password, name, company, phone, role } = req.body;
 
     // Check if user exists
     let user = await User.findOne({ email });
@@ -27,7 +27,8 @@ router.post('/register', async (req, res) => {
       password,
       name,
       company,
-      phone
+      phone,
+      role: role || 'customer' // 默认角色为 customer
     });
 
     await user.save();

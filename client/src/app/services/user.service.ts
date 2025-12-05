@@ -48,4 +48,9 @@ export class UserService {
   changePassword(id: string, passwordData: { currentPassword: string; newPassword: string }): Observable<any> {
     return this.http.patch(`${environment.apiUrl}/users/${id}/password`, passwordData);
   }
+
+  // 管理员修改用户密码
+  adminChangePassword(id: string, newPassword: string): Observable<any> {
+    return this.http.patch(`${environment.apiUrl}/users/${id}/password`, { newPassword });
+  }
 }

@@ -104,13 +104,30 @@
             <div class="form-control-plaintext">{{ quote.quoter.name }} ({{ quote.quoter.email }})</div>
           </div>
           
-          <div class="mb-3" *ngIf="quote.supplier">
-            <label class="form-label fw-bold">供应商:</label>
-            <div class="d-flex align-items-center">
-              <div class="form-control-plaintext me-2">{{ quote.supplier.name }} ({{ quote.supplier.email }})</div>
-              <button *ngIf="quote && authService.hasRole('quoter') && (quote.status === 'pending' || quote.status === 'in_progress')" class="btn btn-link p-0 ms-2" (click)="removeSupplierAssignment()" [disabled]="assigning" title="移除供应商分配">
-                <i class="bi bi-x-square-fill text-danger"></i>
-              </button>
+          <!-- 个人供应商分配已禁用，请使用群组分配 -->
+
+          <!-- 群组分配显示 -->
+          <div class="mb-3">
+            <label class="form-label fw-bold">分配群组:</label>
+            <div *ngIf="quote.assignedGroups && quote.assignedGroups.length > 0" class="d-flex flex-wrap gap-2">
+              <span *ngFor="let group of quote.assignedGroups" 
+                    class="badge" 
+                    [style.backgroundColor]="group.color + '20'"
+                    [style.borderColor]="group.color"
+                    [style.color]="group.color"
+                    style="border: 1px solid; padding: 6px 12px;">
+                <i class="bi bi-tags-fill me-1"></i>{{ group.name }}
+                <button *ngIf="canAssignGroups()" 
+                        class="btn btn-sm p-0 ms-1 text-danger" 
+                        (click)="removeGroupAssignment(group._id)" 
+                        [disabled]="assigning" 
+                        title="移除群组分配">
+                  <i class="bi bi-x-circle-fill" style="font-size: 1em;"></i>
+                </button>
+              </span>
+            </div>
+            <div *ngIf="!quote.assignedGroups || quote.assignedGroups.length === 0" class="form-control-plaintext text-muted">
+              未分配群组
             </div>
           </div>
           
@@ -125,19 +142,19 @@
           </div>
         </div>
       </div>
-      
-      <!-- 分配供应商 -->
+
+      <!-- 分配群组（下拉菜单样式） -->
       <div *ngIf="quote && authService.hasRole('quoter') && (quote.status === 'pending' || quote.status === 'in_progress')" class="mt-4">
-        <h5>分配供应商</h5>
+        <h5>分配供应商群组</h5>
         <div class="mb-3">
           <div class="input-group">
-            <select class="form-select" [(ngModel)]="selectedSupplierId">
-              <option value="">请选择供应商</option>
-              <option *ngFor="let supplier of suppliers" [value]="supplier._id">
-                {{ supplier.name }} ({{ supplier.email }})
+            <select class="form-select" [(ngModel)]="selectedGroupId">
+              <option value="">请选择群组</option>
+              <option *ngFor="let group of groups" [value]="group._id">
+                {{ group.name }} ({{ group.users ? group.users.length : 0 }}个供应商成员)
               </option>
             </select>
-            <button class="btn btn-primary" (click)="assignSupplier()" [disabled]="!selectedSupplierId || assigning">
+            <button class="btn btn-primary" (click)="assignSingleGroup()" [disabled]="!selectedGroupId || assigning">
               {{ assigning ? '分配中...' : '分配' }}
             </button>
           </div>
@@ -331,6 +348,63 @@
         <button class="btn btn-success me-2" (click)="saveChanges()" [disabled]="uploading">保存</button>
         <button class="btn btn-secondary" (click)="toggleEditMode()" [disabled]="uploading">取消</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 群组分配模态框 -->
+<div *ngIf="showGroupAssignModal" class="modal-overlay" (click)="closeGroupAssignModal()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h5>分配群组 - {{ quote?.title }}</h5>
+      <button class="btn-close" (click)="closeGroupAssignModal()">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="mb-3">
+        <label class="form-label">选择要分配的群组:</label>
+        <div class="groups-list">
+          <div class="form-check mb-2" *ngFor="let group of groups">
+            <input class="form-check-input" type="checkbox" 
+                   [id]="'group-' + group._id"
+                   [value]="group._id"
+                   [checked]="selectedGroupIds.includes(group._id)"
+                   (change)="onGroupSelectionChange(group._id, $event)">
+            <label class="form-check-label" [for]="'group-' + group._id">
+              <span class="badge me-2" 
+                    [style.backgroundColor]="group.color + '20'"
+                    [style.borderColor]="group.color"
+                    [style.color]="group.color"
+                    style="border: 1px solid;">
+                <i class="bi bi-tags-fill"></i>
+              </span>
+              <strong>{{ group.name }}</strong>
+              <div class="text-muted small" *ngIf="group.description">{{ group.description }}</div>
+              <div class="text-muted small" *ngIf="group.users && group.users.length > 0">
+                <i class="bi bi-people-fill"></i> {{ group.users.length }} 个供应商成员
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      <div class="selected-info" *ngIf="selectedGroupIds.length > 0">
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>
+          已选择 {{ selectedGroupIds.length }} 个群组，分配后询价单状态将变为"处理中"并向所有群组成员发送邮件通知。
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeGroupAssignModal()">取消</button>
+      <button type="button" class="btn btn-primary" 
+              (click)="assignGroupsToQuote()" 
+              [disabled]="selectedGroupIds.length === 0 || assigning">
+        {{ assigning ? '分配中...' : '确认分配' }}
+      </button>
     </div>
   </div>
 </div>

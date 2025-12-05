@@ -20,6 +20,8 @@ import { ForgotPasswordComponent } from './components/forgot-password/forgot-pas
 import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
 import { AuthInterceptor } from './interceptors/auth.interceptor';
 import { NavbarComponent } from './components/navbar/navbar.component';
+import { GroupManagementComponent } from './components/group-management/group-management.component';
+import { FilterPipe } from './pipes/filter.pipe';
 
 
 
@@ -38,6 +40,8 @@ import { NavbarComponent } from './components/navbar/navbar.component';
     ForgotPasswordComponent,
     ResetPasswordComponent,
     NavbarComponent,
+    GroupManagementComponent,
+    FilterPipe,
   ],
   imports: [
     BrowserModule,

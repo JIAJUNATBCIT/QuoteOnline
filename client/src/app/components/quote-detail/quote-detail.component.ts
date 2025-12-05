@@ -8,6 +8,7 @@ import { TokenService } from '../../services/token.service';
 import { getStatusDisplayName } from '../../utils/status.utils';
 import { FileUtils, TempFile } from '../../utils/file.utils';
 import { environment } from '../../../environments/environment';
+import { GroupService, Group } from '../../services/group.service';
 
 @Component({
   selector: 'app-quote-detail',
@@ -28,13 +29,17 @@ export class QuoteDetailComponent implements OnInit {
   error = '';
   quoters: any[] = [];
   suppliers: any[] = [];
+  groups: Group[] = [];
   editMode = false;
   quoteForm: any = {};
   uploading = false;
   uploadProgress = 0;
   assigning = false;
   selectedSupplierId = '';
+  selectedGroupId = '';
   selectedFiles: File[] = [];
+  selectedGroupIds: string[] = [];
+  showGroupAssignModal = false;
   hasUnsavedChanges = false; // 标记是否有未保存的文件更改
   tempCustomerFiles: File[] = []; // 临时存储客户文件
   tempSupplierFiles: File[] = []; // 临时存储供应商文件
@@ -55,6 +60,7 @@ export class QuoteDetailComponent implements OnInit {
     private permissionService: PermissionService,
     private tokenService: TokenService,
     private ngZone: NgZone,
+    private groupService: GroupService
   ) { }
 
   ngOnInit() {
@@ -66,6 +72,7 @@ export class QuoteDetailComponent implements OnInit {
       }
       if (this.authService.hasRole('quoter') || this.authService.hasRole('admin')) {
         this.loadSuppliers();
+        this.loadGroups();
       }
     }
   }
@@ -104,6 +111,17 @@ export class QuoteDetailComponent implements OnInit {
       },
       error: (error) => {
         console.error('加载供应商列表失败:', error);
+      }
+    });
+  }
+
+  loadGroups() {
+    this.groupService.getAllGroups().subscribe({
+      next: (groups) => {
+        this.groups = groups.filter(group => group.isActive);
+      },
+      error: (error) => {
+        console.error('加载群组列表失败:', error);
       }
     });
   }
@@ -251,19 +269,7 @@ export class QuoteDetailComponent implements OnInit {
     });
   }
 
-  // 获取文件类型的中文名称
-  private getFileTypeName(fileType: string): string {
-    switch (fileType) {
-      case 'customer':
-        return '客户询价';
-      case 'supplier':
-        return '供应商报价';
-      case 'quoter':
-        return '最终报价';
-      default:
-        return '文件';
-    }
-  }
+
 
   onFilesSelected(event: any) {
     const files = Array.from(event.target.files) as File[];
@@ -709,24 +715,24 @@ export class QuoteDetailComponent implements OnInit {
     });
   }
 
-  assignSupplier() {
-    if (!this.quote || !this.selectedSupplierId) return;
+  assignSingleGroup() {
+    if (!this.quote || !this.selectedGroupId) return;
     
     this.assigning = true;
-    this.quoteService.assignSupplier(this.quote._id, this.selectedSupplierId).subscribe({
+    this.quoteService.assignGroupsToQuote(this.quote._id, [this.selectedGroupId]).subscribe({
       next: (quote) => {
         this.ngZone.run(() => {
           this.quote = quote;
           this.assigning = false;
-          this.selectedSupplierId = '';
-          alert('供应商分配成功');
+          this.selectedGroupId = '';
+          alert('群组分配成功');
         });
       },
       error: (error) => {
         this.ngZone.run(() => {
-          console.error('分配供应商失败:', error);
+          console.error('分配群组失败:', error);
           this.assigning = false;
-          alert('分配供应商失败');
+          alert('分配群组失败');
         });
       }
     });
@@ -1032,6 +1038,92 @@ export class QuoteDetailComponent implements OnInit {
     } else {
       return 'text-muted';
     }
+  }
+
+  // 群组分配相关方法
+  openGroupAssignModal() {
+    this.selectedGroupIds = this.quote?.assignedGroups?.map((g: any) => g._id) || [];
+    this.showGroupAssignModal = true;
+  }
+
+  closeGroupAssignModal() {
+    this.showGroupAssignModal = false;
+    this.selectedGroupIds = [];
+  }
+
+  assignGroupsToQuote() {
+    if (!this.quote) return;
+    
+    this.assigning = true;
+    this.quoteService.assignGroupsToQuote(this.quote._id, this.selectedGroupIds).subscribe({
+      next: (quote) => {
+        this.ngZone.run(() => {
+          this.quote = quote;
+          this.assigning = false;
+          this.closeGroupAssignModal();
+          alert('群组分配成功');
+        });
+      },
+      error: (error) => {
+        this.ngZone.run(() => {
+          console.error('群组分配失败:', error);
+          this.assigning = false;
+          alert('群组分配失败');
+        });
+      }
+    });
+  }
+
+  onGroupSelectionChange(groupId: string, event: any) {
+    if (event.target.checked) {
+      this.selectedGroupIds.push(groupId);
+    } else {
+      const index = this.selectedGroupIds.indexOf(groupId);
+      if (index > -1) {
+        this.selectedGroupIds.splice(index, 1);
+      }
+    }
+  }
+
+  removeGroupAssignment(groupId: string) {
+    if (!this.quote) return;
+    
+    if (!confirm('确定要移除这个群组分配吗？')) {
+      return;
+    }
+    
+    this.quoteService.removeGroupAssignment(this.quote._id, groupId).subscribe({
+      next: (quote) => {
+        this.ngZone.run(() => {
+          this.quote = quote;
+          alert('群组分配已移除');
+        });
+      },
+      error: (error) => {
+        this.ngZone.run(() => {
+          console.error('移除群组分配失败:', error);
+          alert('移除群组分配失败');
+        });
+      }
+    });
+  }
+
+  // 检查是否可以分配群组
+  canAssignGroups(): boolean {
+    if (!this.quote) return false;
+    const user = this.authService.getCurrentUser();
+    if (!user) return false;
+    
+    return this.authService.hasRole(['admin', 'quoter']) && ['pending', 'in_progress'].includes(this.quote.status);
+  }
+
+  // 获取群组名称列表
+  getAssignedGroupNames(): string {
+    if (!this.quote?.assignedGroups || this.quote.assignedGroups.length === 0) {
+      return '未分配群组';
+    }
+    
+    return this.quote.assignedGroups.map((g: any) => g.name).join(', ');
   }
 
 }

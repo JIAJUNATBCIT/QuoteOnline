@@ -78,9 +78,15 @@ export class AuthService {
     return !!this.currentUserSubject.value && !!this.tokenService.getAccessToken();
   }
 
-  hasRole(role: string): boolean {
+  hasRole(role: string | string[]): boolean {
     const user = this.currentUserSubject.value;
-    return user ? user.role === role : false;
+    if (!user) return false;
+    
+    if (Array.isArray(role)) {
+      return role.includes(user.role);
+    } else {
+      return user.role === role;
+    }
   }
 
   getToken(): string | null {

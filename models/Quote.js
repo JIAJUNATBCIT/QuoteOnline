@@ -56,6 +56,10 @@ const QuoteSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  assignedGroups: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Group'
+  }],
   status: {
     type: String,
     enum: ['pending', 'supplier_quoted', 'in_progress', 'quoted', 'cancelled', 'rejected'],

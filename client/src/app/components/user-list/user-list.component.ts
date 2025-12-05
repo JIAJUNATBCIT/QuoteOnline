@@ -94,4 +94,35 @@ export class UserListComponent implements OnInit {
       });
     }
   }
+
+  changeUserPassword(user: User) {
+    const newPassword = prompt(`请输入用户 "${user.name}" 的新密码 (至少6个字符):`);
+    
+    if (!newPassword) {
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      alert('密码至少需要6个字符');
+      return;
+    }
+    
+    // 确认密码
+    const confirmPassword = prompt('请再次输入新密码进行确认:');
+    
+    if (newPassword !== confirmPassword) {
+      alert('两次输入的密码不一致');
+      return;
+    }
+    
+    this.userService.adminChangePassword(user._id, newPassword).subscribe({
+      next: () => {
+        alert(`用户 "${user.name}" 的密码修改成功`);
+      },
+      error: (error) => {
+        console.error('修改密码失败:', error);
+        alert('修改密码失败');
+      }
+    });
+  }
 }

@@ -75,6 +75,35 @@ router.patch('/:id/role', auth, authorize('admin'), async (req, res) => {
   }
 });
 
+// Update user password (admin only)
+router.patch('/:id/password', auth, authorize('admin'), async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: '新密码至少需要6个字符' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: '用户不存在' });
+    }
+
+    // 管理员不能修改自己的密码，应该使用专门的修改密码接口
+    if (req.user.userId === req.params.id) {
+      return res.status(400).json({ message: '管理员不能通过此接口修改自己的密码，请使用个人密码修改功能' });
+    }
+
+    // 更新密码
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: '密码修改成功' });
+  } catch (error) {
+    res.status(500).json({ message: '服务器错误', error: error.message });
+  }
+});
+
 // Update user profile
 router.put('/:id', auth, async (req, res) => {
   try {

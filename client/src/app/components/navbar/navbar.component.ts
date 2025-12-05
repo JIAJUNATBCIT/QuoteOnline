@@ -9,6 +9,7 @@ import { Router } from '@angular/router';
 })
 export class NavbarComponent {
   isDropdownOpen = false;
+  isMobileMenuOpen = false;
 
   constructor(
     public authService: AuthService,
@@ -25,11 +26,23 @@ export class NavbarComponent {
     this.isDropdownOpen = false;
   }
 
+  toggleMobileMenu() {
+    this.isMobileMenuOpen = !this.isMobileMenuOpen;
+  }
+
+  closeMobileMenu() {
+    this.isMobileMenuOpen = false;
+  }
+
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event) {
     const clickedInside = this.el.nativeElement.contains(event.target);
     if (!clickedInside) {
       this.isDropdownOpen = false;
+      // 关闭移动端菜单
+      if (this.isMobileMenuOpen) {
+        this.isMobileMenuOpen = false;
+      }
     }
   }
 
