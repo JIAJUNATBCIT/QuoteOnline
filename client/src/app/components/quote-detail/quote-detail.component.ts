@@ -725,44 +725,20 @@ export class QuoteDetailComponent implements OnInit {
           this.quote = quote;
           this.assigning = false;
           this.selectedGroupId = '';
-          alert('群组分配成功');
+          alert('供应商分配成功');
         });
       },
       error: (error) => {
         this.ngZone.run(() => {
-          console.error('分配群组失败:', error);
+          console.error('分配供应商失败:', error);
           this.assigning = false;
-          alert('分配群组失败');
+          alert('分配供应商失败');
         });
       }
     });
   }
 
-  removeSupplierAssignment() {
-    if (!this.quote || !this.quote.supplier) return;
-    
-    if (!confirm('确定要移除已分配的供应商吗？供应商将需要重新分配。')) {
-      return;
-    }
-    
-    this.assigning = true;
-    this.quoteService.removeSupplierAssignment(this.quote._id).subscribe({
-      next: (quote) => {
-        this.ngZone.run(() => {
-          this.quote = quote;
-          this.assigning = false;
-          alert('供应商分配已移除');
-        });
-      },
-      error: (error) => {
-        this.ngZone.run(() => {
-          console.error('移除供应商分配失败:', error);
-          this.assigning = false;
-          alert('移除供应商分配失败');
-        });
-      }
-    });
-  }
+
 
   toggleEditMode() {
     this.editMode = !this.editMode;
@@ -834,7 +810,7 @@ export class QuoteDetailComponent implements OnInit {
     const user = this.authService.getCurrentUser();
     if (!user) return false;
     
-    return this.permissionService.canRejectQuote(this.quote, user);
+    return this.permissionService.canRejectQuote(user);
   }
 
   canDeleteFile(fileType: string): boolean {
@@ -1061,14 +1037,14 @@ export class QuoteDetailComponent implements OnInit {
           this.quote = quote;
           this.assigning = false;
           this.closeGroupAssignModal();
-          alert('群组分配成功');
+          alert('供应商分配成功');
         });
       },
       error: (error) => {
         this.ngZone.run(() => {
-          console.error('群组分配失败:', error);
+          console.error('供应商分配失败:', error);
           this.assigning = false;
-          alert('群组分配失败');
+          alert('供应商分配失败');
         });
       }
     });

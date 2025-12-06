@@ -24,8 +24,8 @@ export class PermissionService {
   }
 
   // 检查用户是否可以拒绝询价单
-  canRejectQuote(quote: Quote, user: User): boolean {
-    return PermissionUtils.canRejectQuote(quote, user);
+  canRejectQuote(user: User): boolean {
+    return PermissionUtils.canRejectQuote(user);
   }
 
   // 检查用户是否可以删除文件

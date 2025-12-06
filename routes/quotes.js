@@ -920,48 +920,7 @@ router.delete('/:id/groups/:groupId', auth, async (req, res) => {
   }
 });
 
-// Remove supplier assignment (quoter or admin only)
-router.patch('/:id/remove-supplier', auth, async (req, res) => {
-  try {
-    // 验证权限：只有报价员和管理员可以移除供应商分配
-    if (!['quoter', 'admin'].includes(req.user.role)) {
-      return res.status(403).json({ message: '权限不足' });
-    }
 
-    const quote = await Quote.findById(req.params.id);
-    
-    if (!quote) {
-      return res.status(404).json({ message: '询价单不存在' });
-    }
-
-    // 检查是否有供应商分配
-    if (!quote.supplier) {
-      return res.status(400).json({ message: '该询价单未分配供应商' });
-    }
-
-    // 检查询价单状态是否允许移除供应商
-    // 只有在 pending 或 in_progress 状态下才能移除供应商
-    if (!['pending', 'in_progress'].includes(quote.status)) {
-      return res.status(400).json({ message: '当前状态不允许移除供应商分配' });
-    }
-
-    const updatedQuote = await Quote.findByIdAndUpdate(
-      req.params.id,
-      { 
-        $unset: { supplier: 1 },
-        status: 'pending'
-      },
-      { new: true }
-    ).populate('customer', 'name email company')
-     .populate('quoter', 'name email company')
-     .populate('supplier', 'name email company');
-
-    res.json(updatedQuote);
-  } catch (error) {
-    logger.request(req, Date.now() - (req.startTime || Date.now()), error);
-    res.status(500).json({ message: '服务器错误', error: error.message });
-  }
-});
 
 // Assign quote to quoter (admin only)
 router.patch('/:id/assign', auth, authorize('admin'), async (req, res) => {

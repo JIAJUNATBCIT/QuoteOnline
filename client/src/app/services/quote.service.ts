@@ -69,9 +69,7 @@ export class QuoteService {
     return this.http.patch<Quote>(`${environment.apiUrl}/quotes/${id}/assign-supplier`, { supplierId });
   }
 
-  removeSupplierAssignment(id: string): Observable<Quote> {
-    return this.http.patch<Quote>(`${environment.apiUrl}/quotes/${id}/remove-supplier`, {});
-  }
+
 
   rejectQuote(id: string, rejectReason: string): Observable<Quote> {
     return this.http.patch<Quote>(`${environment.apiUrl}/quotes/${id}/reject`, { rejectReason });

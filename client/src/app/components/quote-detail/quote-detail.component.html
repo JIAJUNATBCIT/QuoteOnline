@@ -108,7 +108,7 @@
 
           <!-- 群组分配显示 -->
           <div class="mb-3" *ngIf="quote && !authService.hasRole('customer')">
-            <label class="form-label fw-bold">分配群组:</label>
+            <label class="form-label fw-bold">供应商:</label>
             <div *ngIf="quote.assignedGroups && quote.assignedGroups.length > 0" class="d-flex flex-wrap gap-2">
               <span *ngFor="let group of quote.assignedGroups" 
                     class="badge" 
@@ -127,7 +127,7 @@
               </span>
             </div>
             <div *ngIf="!quote.assignedGroups || quote.assignedGroups.length === 0" class="form-control-plaintext text-muted">
-              未分配群组
+              未分配供应商
             </div>
           </div>
           
@@ -145,13 +145,13 @@
 
       <!-- 分配群组（下拉菜单样式） -->
       <div *ngIf="quote && authService.hasRole('quoter') && (quote.status === 'pending' || quote.status === 'in_progress')" class="mt-4">
-        <h5>分配供应商群组</h5>
+        <h5>分配供应商</h5>
         <div class="mb-3">
           <div class="input-group">
             <select class="form-select" [(ngModel)]="selectedGroupId">
-              <option value="">请选择群组</option>
+              <option value="">请选择供应商</option>
               <option *ngFor="let group of groups" [value]="group._id">
-                {{ group.name }} ({{ group.users ? group.users.length : 0 }}个供应商成员)
+                {{ group.name }} ({{ group.users ? group.users.length : 0 }}名成员)
               </option>
             </select>
             <button class="btn btn-primary" (click)="assignSingleGroup()" [disabled]="!selectedGroupId || assigning">
@@ -364,7 +364,7 @@
     
     <div class="modal-body">
       <div class="mb-3">
-        <label class="form-label">选择要分配的群组:</label>
+        <label class="form-label">选择要分配的供应商:</label>
         <div class="groups-list">
           <div class="form-check mb-2" *ngFor="let group of groups">
             <input class="form-check-input" type="checkbox" 
@@ -383,7 +383,7 @@
               <strong>{{ group.name }}</strong>
               <div class="text-muted small" *ngIf="group.description">{{ group.description }}</div>
               <div class="text-muted small" *ngIf="group.users && group.users.length > 0">
-                <i class="bi bi-people-fill"></i> {{ group.users.length }} 个供应商成员
+                <i class="bi bi-people-fill"></i> {{ group.users.length }} 名成员
               </div>
             </label>
           </div>
@@ -393,7 +393,7 @@
       <div class="selected-info" *ngIf="selectedGroupIds.length > 0">
         <div class="alert alert-info">
           <i class="bi bi-info-circle me-2"></i>
-          已选择 {{ selectedGroupIds.length }} 个群组，分配后询价单状态将变为"处理中"并向所有群组成员发送邮件通知。
+          已选择 {{ selectedGroupIds.length }} 个供应商，分配后询价单状态将变为"处理中"并向所有群组成员发送邮件通知。
         </div>
       </div>
     </div>

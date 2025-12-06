@@ -3,6 +3,8 @@
  * 统一前后端权限检查逻辑
  */
 
+import { User } from "./user.types";
+
 export class PermissionUtils {
   
   /**
@@ -85,21 +87,9 @@ export class PermissionUtils {
    * @param user 用户对象
    * @returns 是否可以拒绝
    */
-  static canRejectQuote(quote: any, user: any): boolean {
+  static canRejectQuote(user: User): boolean {
     if (!user) return false;
-    
-    switch (user.role) {
-      case 'customer':
-        return false;
-      case 'supplier':
-        const rejectUserId = user._id;
-        return quote.supplier && (quote.supplier._id === rejectUserId || quote.supplier === rejectUserId);
-      case 'quoter':
-      case 'admin':
-        return true;
-      default:
-        return false;
-    }
+    return user.role === 'quoter' || user.role === 'admin';
   }
 
   /**
