@@ -18,7 +18,7 @@ function generateAccessToken(payload) {
  */
 function generateRefreshToken(payload) {
   return jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { 
-    expiresIn: '3d' // 3天
+    expiresIn: '24h' // 24小时
   });
 }
 
