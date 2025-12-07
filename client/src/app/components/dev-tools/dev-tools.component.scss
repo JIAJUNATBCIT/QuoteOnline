@@ -1,0 +1,316 @@
+.dev-tools {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+
+  &.production {
+    display: none; // 生产环境隐藏
+  }
+
+  .dev-tools-toggle {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: #5a6268;
+    }
+
+    &.expanded {
+      background: #007bff;
+    }
+  }
+
+  .dev-tools-panel {
+    position: absolute;
+    bottom: 50px;
+    right: 0;
+    width: 400px;
+    max-height: 500px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+
+    &.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .dev-tools-header {
+      background: #f8f9fa;
+      padding: 10px 15px;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      h6 {
+        margin: 0;
+        color: #495057;
+        font-weight: bold;
+      }
+
+      .close-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #6c757d;
+        padding: 2px 6px;
+        border-radius: 2px;
+
+        &:hover {
+          background: #e9ecef;
+        }
+      }
+    }
+
+    .dev-tools-content {
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 15px;
+    }
+
+    .section {
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #f1f3f4;
+
+      &:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+      }
+
+      h6 {
+        margin: 0 0 10px 0;
+        color: #343a40;
+        font-weight: bold;
+        font-size: 13px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+
+        button {
+          font-size: 11px;
+          padding: 4px 8px;
+          border-radius: 3px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+      }
+
+      .error-summary {
+        margin: 8px 0;
+
+        .badge {
+          font-size: 10px;
+          margin-right: 5px;
+          padding: 2px 6px;
+        }
+      }
+
+      .error-list {
+        .error-item {
+          background: #f8d7da;
+          border: 1px solid #f5c6cb;
+          border-radius: 3px;
+          padding: 6px 8px;
+          margin-bottom: 5px;
+
+          .error-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+
+            .error-status {
+              font-weight: bold;
+              font-size: 10px;
+              padding: 1px 4px;
+              border-radius: 2px;
+              color: white;
+
+              &.status-4xx {
+                background: #ffc107;
+                color: #212529;
+              }
+
+              &.status-5xx {
+                background: #dc3545;
+              }
+
+              &.status-success {
+                background: #28a745;
+              }
+            }
+
+            small {
+              color: #6c757d;
+            }
+
+            .btn-xs {
+              font-size: 9px;
+              padding: 1px 4px;
+              line-height: 1;
+            }
+          }
+
+          .error-message {
+            font-size: 11px;
+            color: #721c24;
+            word-break: break-word;
+          }
+        }
+      }
+
+      .no-errors {
+        text-align: center;
+        padding: 10px;
+        color: #28a745;
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        border-radius: 3px;
+      }
+
+      .token-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 3px;
+        margin-bottom: 10px;
+        font-weight: bold;
+
+        .status-indicator {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+
+        &.valid {
+          background: #d4edda;
+          color: #155724;
+          .status-indicator { background: #28a745; }
+        }
+
+        &.expiring {
+          background: #fff3cd;
+          color: #856404;
+          .status-indicator { background: #ffc107; }
+        }
+
+        &.expired {
+          background: #f8d7da;
+          color: #721c24;
+          .status-indicator { background: #dc3545; }
+        }
+      }
+
+      .token-details, .user-details {
+        .token-item, .user-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 5px;
+          font-size: 11px;
+
+          label {
+            font-weight: bold;
+            color: #495057;
+            margin-right: 10px;
+          }
+
+          .token-value {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 10px;
+            word-break: break-all;
+          }
+
+          span {
+            color: #6c757d;
+          }
+        }
+      }
+
+      .user-info {
+        .login-status {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 8px;
+          border-radius: 3px;
+          margin-bottom: 10px;
+          font-weight: bold;
+
+          &.logged-in {
+            background: #d4edda;
+            color: #155724;
+          }
+
+          &:not(.logged-in) {
+            background: #f8d7da;
+            color: #721c24;
+          }
+        }
+      }
+    }
+  }
+}
+
+// 徽章样式
+.badge-warning {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.badge-danger {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.badge-success {
+  background-color: #198754;
+  color: #fff;
+}
+
+.badge-secondary {
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.status-4xx {
+  color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.status-5xx {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.status-success {
+  color: #10b981;
+  background-color: rgba(16, 185, 129, 0.1);
+}

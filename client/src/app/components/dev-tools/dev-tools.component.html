@@ -1,0 +1,133 @@
+<div class="dev-tools" [class.production]="isProduction">
+  <button 
+    class="dev-tools-toggle" 
+    (click)="isExpanded = !isExpanded"
+    [class.expanded]="isExpanded"
+    *ngIf="!isProduction && isAdmin">
+    <i class="bi bi-tools"></i>
+    开发工具
+  </button>
+
+  <div class="dev-tools-panel" [class.visible]="isExpanded" *ngIf="!isProduction && isAdmin">
+    <div class="dev-tools-header">
+      <h6>开发工具面板</h6>
+      <button class="close-btn" (click)="isExpanded = false">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+
+    <div class="dev-tools-content">
+      <!-- 错误信息 -->
+      <div class="section">
+        <h6>错误信息 ({{ errorSummary.total }})</h6>
+        <div class="actions">
+          <button class="btn-sm btn-primary" (click)="loadErrorInfo()">
+            <i class="bi bi-arrow-clockwise"></i> 刷新
+          </button>
+          <button class="btn-sm btn-danger" (click)="clearErrors()" *ngIf="errors.length > 0">
+            <i class="bi bi-trash"></i> 清除
+          </button>
+        </div>
+        
+        <div class="error-summary" *ngIf="Object.keys(errorSummary.byStatus).length > 0">
+          <span *ngFor="let statusItem of Object.keys(errorSummary.byStatus) | keyvalue" 
+                class="badge" 
+                [class.badge-warning]="+statusItem.key >= 400 && +statusItem.key < 500"
+                [class.badge-danger]="+statusItem.key >= 500"
+                [class.badge-success]="+statusItem.key >= 200 && +statusItem.key < 300"
+                [class.badge-secondary]="!(+statusItem.key >= 200 && +statusItem.key < 300) && !(+statusItem.key >= 400)">
+            {{ statusItem.key }}: {{ errorSummary.byStatus[+statusItem.key] }}
+          </span>
+        </div>
+
+        <div class="error-list" *ngIf="errors.length > 0">
+          <div class="error-item" *ngFor="let error of errors.slice(0, 10)">
+          <div class="error-header">
+            <span class="error-status" 
+                  [class.status-4xx]="error.statusCode && error.statusCode >= 400 && error.statusCode < 500"
+                  [class.status-5xx]="error.statusCode && error.statusCode >= 500"
+                  [class.status-success]="error.statusCode && error.statusCode >= 200 && error.statusCode < 300">
+              {{ error.statusCode }}
+            </span>
+            <small>{{ error.timestamp | date:'HH:mm:ss' }}</small>
+            <button class="btn-xs btn-outline" (click)="copyErrorToClipboard(error)">
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </div>
+            <div class="error-message">{{ error.message }}</div>
+          </div>
+        </div>
+        
+        <div class="no-errors" *ngIf="errors.length === 0">
+          <i class="bi bi-check-circle text-success"></i> 暂无错误
+        </div>
+      </div>
+
+      <!-- Token 信息 -->
+      <div class="section">
+        <h6>Token 状态</h6>
+        <div class="token-status" [class]="tokenStatus">
+          <span class="status-indicator"></span>
+          {{ getTokenStatusText() }}
+        </div>
+        
+        <div class="token-details">
+          <div class="token-item">
+            <label>Access Token:</label>
+            <code class="token-value">{{ tokenInfo.accessToken ? '***有效***' : '无' }}</code>
+          </div>
+          <div class="token-item">
+            <label>Refresh Token:</label>
+            <code class="token-value">{{ tokenInfo.refreshToken ? '***有效***' : '无' }}</code>
+          </div>
+          <div class="token-item" *ngIf="tokenInfo.tokenExpiry">
+            <label>过期时间:</label>
+            <span>{{ tokenInfo.tokenExpiry | date:'HH:mm:ss' }}</span>
+          </div>
+          <div class="token-item">
+            <label>刷新阈值:</label>
+            <span>{{ tokenInfo.refreshThreshold }} 分钟</span>
+          </div>
+        </div>
+        
+        <div class="actions">
+          <button class="btn-sm btn-primary" (click)="refreshTokens()">
+            <i class="bi bi-arrow-clockwise"></i> 刷新Token
+          </button>
+        </div>
+      </div>
+
+      <!-- 用户信息 -->
+      <div class="section">
+        <h6>用户状态</h6>
+        <div class="user-info">
+          <div class="login-status" [class.logged-in]="userInfo.isLoggedIn">
+            <i class="bi" [class]="userInfo.isLoggedIn ? 'bi-person-check' : 'bi-person-x'"></i>
+            {{ userInfo.isLoggedIn ? '已登录' : '未登录' }}
+          </div>
+          
+          <div *ngIf="userInfo.user" class="user-details">
+            <div class="user-item">
+              <label>用户名:</label>
+              <span>{{ userInfo.user.username }}</span>
+            </div>
+            <div class="user-item">
+              <label>角色:</label>
+              <span>{{ userInfo.user.role }}</span>
+            </div>
+            <div class="user-item">
+              <label>最后检查:</label>
+              <span>{{ userInfo.lastCheck | date:'HH:mm:ss' }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="actions" *ngIf="userInfo.isLoggedIn">
+          <button class="btn-sm btn-warning" (click)="logout()">
+            <i class="bi bi-box-arrow-right"></i> 登出
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -30,6 +30,17 @@ export class TokenService {
     return localStorage.getItem(this.ACCESS_TOKEN_KEY);
   }
 
+  // 获取 refresh token
+  getRefreshToken(): string | null {
+    return localStorage.getItem('refresh_token');
+  }
+
+  // 获取 token 过期时间
+  getTokenExpiry(): Date | null {
+    const expiry = this.getAccessTokenExpiry();
+    return expiry ? new Date(expiry) : null;
+  }
+
   // 设置 access token
   setAccessToken(token: string, expiresIn: number = 30 * 60): void { // 默认30分钟
     const expiryTime = Date.now() + (expiresIn * 1000);
@@ -94,7 +105,7 @@ export class TokenService {
     };
     
     return this.http.post<TokenResponse>(`${environment.apiUrl}/auth/refresh`, {}, { headers }).pipe(
-      switchMap(response => {
+      switchMap((response: TokenResponse) => {
         this.isRefreshing = false;
         this.setAccessToken(response.accessToken);
         this.refreshTokenSubject.next(response.accessToken);

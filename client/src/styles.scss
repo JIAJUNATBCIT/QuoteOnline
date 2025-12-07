@@ -1,10 +1,11 @@
-/* 全局样式 */
-@import 'bootstrap/scss/functions';
-@import 'bootstrap/scss/variables';
-@import 'bootstrap/scss/mixins';
+/* 使用 npm 包路径引入 Bootstrap */
+@import "../node_modules/bootstrap/scss/bootstrap";
+@import "../node_modules/bootstrap-icons/font/bootstrap-icons";
+
+// 自定义样式
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  /* 字体已在 _fonts.scss 中定义，移除重复定义 */
   background-color: #f8f9fa;
 }
 

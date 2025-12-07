@@ -4,6 +4,7 @@ import { Observable, throwError, BehaviorSubject } from 'rxjs';
 import { catchError, filter, take, switchMap } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
 import { TokenService } from '../services/token.service';
+import { ErrorHandlerService } from '../services/error-handler.service';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
@@ -12,7 +13,8 @@ export class AuthInterceptor implements HttpInterceptor {
 
   constructor(
     private authService: AuthService, 
-    private tokenService: TokenService
+    private tokenService: TokenService,
+    private errorHandler: ErrorHandlerService
   ) {}
 
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
@@ -28,12 +30,12 @@ export class AuthInterceptor implements HttpInterceptor {
     }
     
     return next.handle(request).pipe(
-      catchError(error => {
-        if (error instanceof HttpErrorResponse && error.status === 401) {
-          return this.handle401Error(request, next);
-        }
-        return throwError(() => error);
-      })
+        catchError(error => {
+          if (error instanceof HttpErrorResponse && error.status === 401) {
+            return this.handle401Error(request, next);
+          }
+          return this.errorHandler.handleError(error);
+        })
     );
   }
 
@@ -60,7 +62,7 @@ export class AuthInterceptor implements HttpInterceptor {
           this.isRefreshing = false;
           this.tokenService.clearTokens();
           this.authService.logout();
-          return throwError(() => error);
+          return this.errorHandler.handleError(error);
         })
       );
     }

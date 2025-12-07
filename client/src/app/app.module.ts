@@ -1,9 +1,10 @@
-import { NgModule } from '@angular/core';
+import { NgModule, ErrorHandler } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
-import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
+import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
+import { GlobalErrorHandler } from './error.handler';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -22,43 +23,42 @@ import { AuthInterceptor } from './interceptors/auth.interceptor';
 import { NavbarComponent } from './components/navbar/navbar.component';
 import { GroupManagementComponent } from './components/group-management/group-management.component';
 import { FilterPipe } from './pipes/filter.pipe';
+import { DevToolsComponent } from './components/dev-tools/dev-tools.component';
 
 
 
-@NgModule({
-  declarations: [
-    AppComponent,
-    LoginComponent,
-    RegisterComponent,
-    DashboardComponent,
-
-    QuoteCreateComponent,
-    QuoteDetailComponent,
-    UserListComponent,
-    UserProfileComponent,
-    QuoteRedirectComponent,
-    ForgotPasswordComponent,
-    ResetPasswordComponent,
-    NavbarComponent,
-    GroupManagementComponent,
-    FilterPipe,
-  ],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    HttpClientModule,
-    ReactiveFormsModule,
-    FormsModule,
-    CommonModule,
-    NgbModule
-  ],
-  providers: [
-    {
-      provide: HTTP_INTERCEPTORS,
-      useClass: AuthInterceptor,
-      multi: true
-    }
-  ],
-  bootstrap: [AppComponent]
-})
+@NgModule({ declarations: [
+        AppComponent,
+        LoginComponent,
+        RegisterComponent,
+        DashboardComponent,
+        QuoteCreateComponent,
+        QuoteDetailComponent,
+        UserListComponent,
+        UserProfileComponent,
+        QuoteRedirectComponent,
+        ForgotPasswordComponent,
+        ResetPasswordComponent,
+        NavbarComponent,
+        GroupManagementComponent,
+        FilterPipe,
+        DevToolsComponent,
+    ],
+    bootstrap: [AppComponent], imports: [BrowserModule,
+        AppRoutingModule,
+        ReactiveFormsModule,
+        FormsModule,
+        CommonModule,
+        NgbModule],     providers: [
+        {
+            provide: HTTP_INTERCEPTORS,
+            useClass: AuthInterceptor,
+            multi: true
+        },
+        {
+            provide: ErrorHandler,
+            useClass: GlobalErrorHandler
+        },
+        provideHttpClient(withInterceptorsFromDi())
+    ] })
 export class AppModule { }
