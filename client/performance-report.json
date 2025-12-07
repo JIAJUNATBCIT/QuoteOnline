@@ -1,0 +1,66 @@
+{
+  "timestamp": "2025-12-07T01:11:11.429Z",
+  "totalSize": 1210392,
+  "fileCount": 11,
+  "files": [
+    {
+      "name": "main.9cf109b5aabf396b.js",
+      "size": 552277,
+      "sizeFormatted": "539.33 KB"
+    },
+    {
+      "name": "styles.4a3b704a0d3fd4ee.css",
+      "size": 223612,
+      "sizeFormatted": "218.37 KB"
+    },
+    {
+      "name": "bootstrap-icons.154365acf3010d96.woff2",
+      "size": 134044,
+      "sizeFormatted": "130.9 KB"
+    },
+    {
+      "name": "scripts.a5b756e664249597.js",
+      "size": 79643,
+      "sizeFormatted": "77.78 KB"
+    },
+    {
+      "name": "559.b4ce2d70e0b93301.js",
+      "size": 76842,
+      "sizeFormatted": "75.04 KB"
+    },
+    {
+      "name": "421.e8cb330a19324203.js",
+      "size": 66147,
+      "sizeFormatted": "64.6 KB"
+    },
+    {
+      "name": "polyfills.80fc5859b8b4610e.js",
+      "size": 34826,
+      "sizeFormatted": "34.01 KB"
+    },
+    {
+      "name": "3rdpartylicenses.txt",
+      "size": 20730,
+      "sizeFormatted": "20.24 KB"
+    },
+    {
+      "name": "311.4eb9ae0feb013110.js",
+      "size": 17709,
+      "sizeFormatted": "17.29 KB"
+    },
+    {
+      "name": "runtime.7554594f32f4cca1.js",
+      "size": 2822,
+      "sizeFormatted": "2.76 KB"
+    },
+    {
+      "name": "common.935cd0d1c5bf5544.js",
+      "size": 1740,
+      "sizeFormatted": "1.7 KB"
+    }
+  ],
+  "recommendations": [
+    "考虑懒加载",
+    "分离CSS样式"
+  ]
+}

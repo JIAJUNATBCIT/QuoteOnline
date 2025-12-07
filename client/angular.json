@@ -20,7 +20,14 @@
             "outputPath": "dist/quote-online-client",
             "index": "src/index.html",
             "polyfills": ["zone.js"],
-            "optimization": true,
+            "optimization": {
+              "scripts": true,
+              "styles": {
+                "minify": true,
+                "inlineCritical": false
+              },
+              "fonts": true
+            },
             "tsConfig": "tsconfig.app.json",
             "assets": ["src/favicon.ico", "src/assets"],
             "styles": [
@@ -39,13 +46,18 @@
               "budgets": [
                 {
                   "type": "initial",
-                "maximumWarning": "2mb",
-                "maximumError": "3mb"
+                  "maximumWarning": "950kb",
+                  "maximumError": "1.2mb"
                 },
                 {
                   "type": "anyComponentStyle",
-                "maximumWarning": "50kb",
-                "maximumError": "100kb"
+                  "maximumWarning": "250kb",
+                  "maximumError": "300kb"
+                },
+                {
+                  "type": "any",
+                  "maximumWarning": "200kb",
+                  "maximumError": "300kb"
                 }
               ],
               "outputHashing": "all"

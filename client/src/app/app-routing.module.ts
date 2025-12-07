@@ -3,17 +3,10 @@ import { RouterModule, Routes } from '@angular/router';
 import { LoginComponent } from './components/login/login.component';
 import { RegisterComponent } from './components/register/register.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
-
-import { QuoteCreateComponent } from './components/quote-create/quote-create.component';
-import { QuoteDetailComponent } from './components/quote-detail/quote-detail.component';
-import { UserListComponent } from './components/user-list/user-list.component';
-import { UserProfileComponent } from './components/user-profile/user-profile.component';
 import { QuoteRedirectComponent } from './components/quote-redirect/quote-redirect.component';
 import { ForgotPasswordComponent } from './components/forgot-password/forgot-password.component';
 import { ResetPasswordComponent } from './components/reset-password/reset-password.component';
-import { GroupManagementComponent } from './components/group-management/group-management.component';
 import { AuthGuard } from './guards/auth.guard';
-import { RoleGuard } from './guards/role.guard';
 
 const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
@@ -30,33 +23,22 @@ const routes: Routes = [
     component: DashboardComponent,
     canActivate: [AuthGuard]
   },
-  { 
-    path: 'quotes/create', 
-    component: QuoteCreateComponent,
-    canActivate: [AuthGuard, RoleGuard],
-    data: { roles: ['customer'] }
+  // 懒加载模块
+  {
+    path: 'quotes',
+    loadChildren: () => import('./quotes/quotes.module').then(m => m.QuotesModule)
   },
-  { 
-    path: 'quotes/:id', 
-    component: QuoteDetailComponent,
-    canActivate: [AuthGuard]
+  {
+    path: 'users',
+    loadChildren: () => import('./admin/admin.module').then(m => m.AdminModule)
   },
-  { 
-    path: 'users', 
-    component: UserListComponent,
-    canActivate: [AuthGuard, RoleGuard],
-    data: { roles: ['admin'] }
+  {
+    path: 'groups',
+    loadChildren: () => import('./groups/groups.module').then(m => m.GroupsModule)
   },
-  { 
-    path: 'groups', 
-    component: GroupManagementComponent,
-    canActivate: [AuthGuard, RoleGuard],
-    data: { roles: ['admin', 'quoter'] }
-  },
-  { 
-    path: 'profile', 
-    component: UserProfileComponent,
-    canActivate: [AuthGuard]
+  {
+    path: 'profile',
+    loadChildren: () => import('./profile/profile.module').then(m => m.ProfileModule)
   },
   { path: '**', redirectTo: '/dashboard' }
 ];

@@ -1,318 +1,22 @@
-<!-- 模态框放在最外层，避免被其他样式影响 -->
-<!-- 创建群组模态框 -->
-<div *ngIf="showCreateModal" 
-     style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 999999999; display: block !important; backdrop-filter: blur(8px);"
-     (click)="closeCreateModal()">
-  <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); max-width: 500px; width: 90%; max-height: 90vh; display: flex; flex-direction: column; z-index: 1000000000; animation: modalSlideIn 0.3s ease-out;"
-       (click)="$event.stopPropagation()">
-    
-    <!-- Modal Header -->
-    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px 24px; border-bottom: 1px solid #dee2e6; display: flex; align-items: center; justify-content: space-between;">
-      <div style="display: flex; align-items: center; font-size: 1.25rem; font-weight: 600; color: #2c3e50;">
-        <i class="bi bi-plus-circle-fill text-success me-2" style="font-size: 1.5rem; color: #28a745;"></i>
-        <span>创建新群组</span>
-      </div>
-      <button type="button" (click)="closeCreateModal()" 
-              style="background: none; border: none; color: #6c757d; font-size: 1.5rem; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: all 0.2s ease;"
-              onmouseover="this.style.backgroundColor='rgba(0, 0, 0, 0.1)'; this.style.color='#495057';"
-              onmouseout="this.style.backgroundColor='transparent'; this.style.color='#6c757d';">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>
-    
-    <!-- Modal Body -->
-    <div style="padding: 24px; overflow-y: auto; flex: 1;">
-      <form (ngSubmit)="createGroup()">
-        <div style="margin-bottom: 20px;">
-          <label style="display: flex; align-items: center; font-weight: 600; color: #495057; margin-bottom: 8px;">
-            <i class="bi bi-tag me-2" style="color: #007bff; font-size: 0.9rem;"></i>
-            群组名称 <span style="color: #dc3545; margin-left: 4px;">*</span>
-          </label>
-          <div style="display: flex; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <span style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); border: none; color: white; padding: 10px 12px; display: flex; align-items: center; justify-content: center;">
-              <i class="bi bi-hash" style="font-size: 0.875rem;"></i>
-            </span>
-            <input type="text" [(ngModel)]="groupForm.name" name="name" required 
-                   style="flex: 1; padding: 10px 12px; border: 1px solid #ced4da; border-left: none; font-size: 14px; outline: none;"
-                   placeholder="请输入群组名称，例如：电子元件供应商"
-                   onfocus="this.style.boxShadow='0 0 0 0.2rem rgba(0, 123, 255, 0.25)'; this.style.borderColor='#007bff';"
-                   onblur="this.style.boxShadow='none'; this.style.borderColor='#ced4da';">
-          </div>
-        </div>
-        
-        <div style="margin-bottom: 20px;">
-          <label style="display: flex; align-items: center; font-weight: 600; color: #495057; margin-bottom: 8px;">
-            <i class="bi bi-text-paragraph me-2" style="color: #007bff; font-size: 0.9rem;"></i>
-            群组描述
-          </label>
-          <textarea [(ngModel)]="groupForm.description" name="description" rows="3"
-                    style="width: 100%; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; resize: vertical; outline: none;"
-                    placeholder="请输入群组描述（可选）"
-                    onfocus="this.style.boxShadow='0 0 0 0.2rem rgba(0, 123, 255, 0.25)'; this.style.borderColor='#007bff';"
-                    onblur="this.style.boxShadow='none'; this.style.borderColor='#ced4da';"></textarea>
-        </div>
-        
-
-        
-        <!-- Modal Footer -->
-        <div style="border-top: 1px solid #dee2e6; padding-top: 20px; margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
-          <button type="button" (click)="closeCreateModal()" 
-                  style="padding: 10px 20px; font-weight: 500; border-radius: 8px; transition: all 0.2s ease; border: none; background: #6c757d; color: white; cursor: pointer;"
-                  onmouseover="this.style.backgroundColor='#5a6268';"
-                  onmouseout="this.style.backgroundColor='#6c757d';">
-            <i class="bi bi-x-circle me-2" style="font-size: 0.875rem;"></i>
-            取消
-          </button>
-          <button type="submit" 
-                  style="padding: 10px 20px; font-weight: 500; border-radius: 8px; transition: all 0.2s ease; border: none; background: #28a745; color: white; cursor: pointer;"
-                  onmouseover="this.style.backgroundColor='#218838';"
-                  onmouseout="this.style.backgroundColor='#28a745';">
-            <i class="bi bi-plus-circle me-2" style="font-size: 0.875rem;"></i>
-            创建群组
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<!-- 编辑群组模态框 -->
-<div *ngIf="showEditModal" 
-     style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 999999999; display: block !important; backdrop-filter: blur(8px);"
-     (click)="closeEditModal()">
-  <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); max-width: 500px; width: 90%; max-height: 90vh; display: flex; flex-direction: column; z-index: 1000000000; animation: modalSlideIn 0.3s ease-out;"
-       (click)="$event.stopPropagation()">
-    
-    <!-- Modal Header -->
-    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px 24px; border-bottom: 1px solid #dee2e6; display: flex; align-items: center; justify-content: space-between;">
-      <div style="display: flex; align-items: center; font-size: 1.25rem; font-weight: 600; color: #2c3e50;">
-        <i class="bi bi-pencil-square text-primary me-2" style="font-size: 1.5rem; color: #007bff;"></i>
-        <span>编辑群组</span>
-      </div>
-      <button type="button" (click)="closeEditModal()" 
-              style="background: none; border: none; color: #6c757d; font-size: 1.5rem; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: all 0.2s ease;"
-              onmouseover="this.style.backgroundColor='rgba(0, 0, 0, 0.1)'; this.style.color='#495057';"
-              onmouseout="this.style.backgroundColor='transparent'; this.style.color='#6c757d';">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>
-    
-    <!-- Modal Body -->
-    <div style="padding: 24px; overflow-y: auto; flex: 1;">
-      <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-          <span style="font-weight: 500; color: #6c757d;">当前群组:</span>
-          <span style="font-weight: 600; color: #495057;">{{ editForm.name }}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-          <span style="font-weight: 500; color: #6c757d;">创建时间:</span>
-          <span style="font-weight: 600; color: #495057;">{{ selectedGroup?.createdAt | date:'yyyy-MM-dd' }}</span>
-        </div>
-      </div>
-      
-      <form (ngSubmit)="updateGroup()">
-        <div style="margin-bottom: 20px;">
-          <label style="display: flex; align-items: center; font-weight: 600; color: #495057; margin-bottom: 8px;">
-            <i class="bi bi-tag me-2" style="color: #007bff; font-size: 0.9rem;"></i>
-            群组名称 <span style="color: #dc3545; margin-left: 4px;">*</span>
-          </label>
-          <div style="display: flex; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <span style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); border: none; color: white; padding: 10px 12px; display: flex; align-items: center; justify-content: center;">
-              <i class="bi bi-hash" style="font-size: 0.875rem;"></i>
-            </span>
-            <input type="text" [(ngModel)]="editForm.name" name="name" required 
-                   style="flex: 1; padding: 10px 12px; border: 1px solid #ced4da; border-left: none; font-size: 14px; outline: none;"
-                   placeholder="请输入群组名称"
-                   onfocus="this.style.boxShadow='0 0 0 0.2rem rgba(0, 123, 255, 0.25)'; this.style.borderColor='#007bff';"
-                   onblur="this.style.boxShadow='none'; this.style.borderColor='#ced4da';">
-          </div>
-        </div>
-        
-        <div style="margin-bottom: 20px;">
-          <label style="display: flex; align-items: center; font-weight: 600; color: #495057; margin-bottom: 8px;">
-            <i class="bi bi-text-paragraph me-2" style="color: #007bff; font-size: 0.9rem;"></i>
-            群组描述
-          </label>
-          <textarea [(ngModel)]="editForm.description" name="description" rows="3"
-                    style="width: 100%; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; resize: vertical; outline: none;"
-                    placeholder="请输入群组描述（可选）"
-                    onfocus="this.style.boxShadow='0 0 0 0.2rem rgba(0, 123, 255, 0.25)'; this.style.borderColor='#007bff';"
-                    onblur="this.style.boxShadow='none'; this.style.borderColor='#ced4da';"></textarea>
-        </div>
-        
-
-        
-        <div style="margin-bottom: 24px;">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px; border-radius: 8px; transition: background-color 0.2s ease;"
-                 onmouseover="this.style.backgroundColor='#f8f9fa';"
-                 onmouseout="this.style.backgroundColor='transparent';">
-            <div style="position: relative;">
-              <input type="checkbox" [(ngModel)]="editForm.isActive" name="isActive" 
-                     style="width: 48px; height: 24px; background-color: #ced4da; border: none; border-radius: 12px; appearance: none; cursor: pointer; position: relative; transition: all 0.2s ease;"
-                     [style.backgroundColor]="editForm.isActive ? '#28a745' : '#ced4da'">
-            </div>
-            <div style="display: flex; flex-direction: column;">
-              <span style="font-weight: 500; color: #495057;">
-                <i class="bi bi-power me-2"></i>启用群组
-              </span>
-              <small style="font-size: 0.8rem; margin-top: 4px; color: #6c757d;">禁用后，该群组将无法被分配新的询价单</small>
-            </div>
-          </label>
-        </div>
-        
-        <!-- Modal Footer -->
-        <div style="border-top: 1px solid #dee2e6; padding-top: 20px; margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
-          <button type="button" (click)="closeEditModal()" 
-                  style="padding: 10px 20px; font-weight: 500; border-radius: 8px; transition: all 0.2s ease; border: none; background: #6c757d; color: white; cursor: pointer;"
-                  onmouseover="this.style.backgroundColor='#5a6268';"
-                  onmouseout="this.style.backgroundColor='#6c757d';">
-            <i class="bi bi-x-circle me-2" style="font-size: 0.875rem;"></i>
-            取消
-          </button>
-          <button type="submit" 
-                  style="padding: 10px 20px; font-weight: 500; border-radius: 8px; transition: all 0.2s ease; border: none; background: #007bff; color: white; cursor: pointer;"
-                  onmouseover="this.style.backgroundColor='#0056b3';"
-                  onmouseout="this.style.backgroundColor='#007bff';">
-            <i class="bi bi-check-circle me-2" style="font-size: 0.875rem;"></i>
-            保存修改
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<!-- 分配用户模态框 -->
-<div *ngIf="showAssignModal" 
-     style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 999999999; display: block !important; backdrop-filter: blur(8px);"
-     (click)="closeAssignModal()">
-  <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); max-width: 700px; width: 90%; max-height: 90vh; display: flex; flex-direction: column; z-index: 1000000000; animation: modalSlideIn 0.3s ease-out;"
-       (click)="$event.stopPropagation()">
-    
-    <!-- Modal Header -->
-    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px 24px; border-bottom: 1px solid #dee2e6; display: flex; align-items: center; justify-content: space-between;">
-      <div style="display: flex; align-items: center; font-size: 1.25rem; font-weight: 600; color: #2c3e50;">
-        <i class="bi bi-people-fill text-info me-2" style="font-size: 1.5rem; color: #17a2b8;"></i>
-        <span>分配供应商到群组</span>
-      </div>
-      <button type="button" (click)="closeAssignModal()" 
-              style="background: none; border: none; color: #6c757d; font-size: 1.5rem; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: all 0.2s ease;"
-              onmouseover="this.style.backgroundColor='rgba(0, 0, 0, 0.1)'; this.style.color='#495057';"
-              onmouseout="this.style.backgroundColor='transparent'; this.style.color='#6c757d';">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>
-    
-    <!-- Modal Body -->
-    <div style="padding: 24px; overflow-y: auto; flex: 1;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 16px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px;">
-        <div style="display: flex; align-items: center; background: #17a2b8; color: white; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">
-          <i class="bi bi-tag-fill me-2"></i>{{ selectedGroup?.name }}
-        </div>
-        <div style="display: flex; align-items: center; color: #28a745; font-weight: 500;">
-          <i class="bi bi-check-circle-fill me-2"></i>
-          <span>已选择 <strong style="color: #007bff;">{{ selectedSuppliers.length }}</strong> 个供应商</span>
-        </div>
-      </div>
-      
-      <div style="margin-bottom: 20px;">
-        <div style="display: flex; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <span style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); border: none; color: white; padding: 12px 16px; display: flex; align-items: center; justify-content: center;">
-            <i class="bi bi-search"></i>
-          </span>
-          <input type="text" (input)="filterSuppliers($event)"
-                 style="flex: 1; padding: 12px 16px; border: 1px solid #ced4da; border-left: none; font-size: 14px; outline: none;"
-                 placeholder="搜索供应商姓名、邮箱或公司..."
-                 onfocus="this.style.boxShadow='0 0 0 0.2rem rgba(0, 123, 255, 0.25)'; this.style.borderColor='#007bff';"
-                 onblur="this.style.boxShadow='none'; this.style.borderColor='#ced4da';">
-        </div>
-      </div>
-      
-      <div style="border: 1px solid #e9ecef; border-radius: 8px; background: #fafbfc; max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
-        <div *ngIf="filteredSuppliers.length === 0" style="padding: 40px; text-align: center; color: #6c757d;">
-          <i class="bi bi-search" style="font-size: 3rem; margin-bottom: 16px; opacity: 0.5; display: block;"></i>
-          <p style="margin: 0; font-size: 1.1rem;">未找到匹配的供应商</p>
-        </div>
-        
-        <div *ngFor="let supplier of filteredSuppliers" 
-             style="border-bottom: 1px solid #e9ecef; transition: all 0.2s ease;"
-             [style.backgroundColor]="selectedSuppliers.includes(supplier._id) ? 'rgba(23, 162, 184, 0.1)' : 'transparent'"
-             [style.borderLeft]="selectedSuppliers.includes(supplier._id) ? '3px solid #17a2b8' : 'none'"
-             (click)="toggleSupplierSelection(supplier._id)">
-          <label style="display: flex; align-items: center; padding: 16px; margin: 0; cursor: pointer; width: 100%;"
-                 onmouseover="this.style.backgroundColor='#f8f9fa';"
-                 onmouseout="this.style.backgroundColor='transparent';">
-            
-            <div style="position: relative; margin-right: 16px;">
-              <input type="checkbox" 
-                     [checked]="selectedSuppliers.includes(supplier._id)"
-                     style="width: 20px; height: 20px; cursor: pointer; appearance: none; border: 2px solid #ced4da; border-radius: 4px; transition: all 0.2s ease;"
-                     [style.backgroundColor]="selectedSuppliers.includes(supplier._id) ? '#17a2b8' : 'white'"
-                     [style.borderColor]="selectedSuppliers.includes(supplier._id) ? '#17a2b8' : '#ced4da'">
-              <div *ngIf="selectedSuppliers.includes(supplier._id)" 
-                   style="position: absolute; top: 6px; left: 6px; width: 5px; height: 10px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg);"></div>
-            </div>
-            
-            <div style="display: flex; align-items: center; flex: 1;">
-              <div style="margin-right: 12px;">
-                <i class="bi bi-person-circle" style="font-size: 2rem; color: #6c757d;"></i>
-              </div>
-              <div style="flex: 1;">
-                <div style="display: flex; align-items: center; margin-bottom: 4px;">
-                  <strong style="font-size: 1rem; color: #2c3e50;">{{ supplier.name }}</strong>
-                  <span style="margin-left: 8px; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; background: #28a745; color: white;">活跃</span>
-                </div>
-                <div style="color: #6c757d; font-size: 0.875rem; margin-bottom: 2px;">
-                  <i class="bi bi-envelope" style="font-size: 0.75rem; margin-right: 4px;"></i>{{ supplier.email }}
-                </div>
-                <div style="color: #6c757d; font-size: 0.875rem;" *ngIf="supplier.company">
-                  <i class="bi bi-building" style="font-size: 0.75rem; margin-right: 4px;"></i>{{ supplier.company }}
-                </div>
-              </div>
-            </div>
-          </label>
-        </div>
-      </div>
-      
-      <!-- Modal Footer -->
-      <div style="border-top: 1px solid #dee2e6; padding-top: 20px; margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
-        <button type="button" (click)="closeAssignModal()" 
-                style="padding: 10px 20px; font-weight: 500; border-radius: 8px; transition: all 0.2s ease; border: none; background: #6c757d; color: white; cursor: pointer;"
-                onmouseover="this.style.backgroundColor='#5a6268';"
-                onmouseout="this.style.backgroundColor='#6c757d';">
-          <i class="bi bi-x-circle me-2" style="font-size: 0.875rem;"></i>
-          取消
-        </button>
-        <button type="button" (click)="assignUsersToGroup()"
-                [style.padding]="'10px 20px'" [style.fontWeight]="'500'" [style.borderRadius]="'8px'" [style.transition]="'all 0.2s ease'" 
-                [style.border]="'none'" [style.color]="'white'" [style.cursor]="'pointer'"
-                [style.background]="'#17a2b8'"
-                onmouseover="this.style.backgroundColor = '#138496';"
-                onmouseout="this.style.backgroundColor = '#17a2b8';">
-          <i class="bi bi-people-plus me-2" style="font-size: 0.875rem;"></i>
-          确认更新成员
-          <span *ngIf="selectedSuppliers.length > 0">({{ selectedSuppliers.length }})</span>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="group-management">
-  <div class="header">
-    <h2>群组管理</h2>
+  <div class="header d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">群组管理</h2>
     <button class="btn btn-primary" (click)="openCreateModal()" *ngIf="authService.hasRole(['admin', 'quoter'])">
-      <i class="bi bi-plus"></i> 创建群组
+      <i class="bi bi-plus-circle me-2"></i> 创建群组
     </button>
   </div>
 
   <!-- 加载状态 -->
-  <div *ngIf="loading" class="loading">
-    <i class="bi bi-arrow-repeat spin-icon"></i> 加载中...
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+    <p class="mt-2">加载中...</p>
   </div>
 
   <!-- 错误信息 -->
-  <div *ngIf="error" class="alert alert-danger">
+  <div *ngIf="error" class="alert alert-danger" role="alert">
+    <i class="bi bi-exclamation-triangle me-2"></i>
     {{ error }}
   </div>
 
@@ -322,7 +26,7 @@
       <div class="group-header">
         <div class="group-info">
           <h3>{{ group.name }}</h3>
-          <span class="status-badge" [class.active]="group.isActive" [class.inactive]="!group.isActive">
+          <span class="status-badge" [class]="group.isActive ? 'active' : 'inactive'">
             {{ group.isActive ? '启用' : '禁用' }}
           </span>
         </div>
@@ -343,23 +47,19 @@
         <p *ngIf="group.description" class="description">{{ group.description }}</p>
         
         <div class="group-meta">
-          <small>
-            <i class="bi bi-person"></i> 创建者: {{ group.createdBy.name }}
-          </small>
-          <small>
-            <i class="bi bi-calendar"></i> 创建时间: {{ group.createdAt | date:'yyyy-MM-dd HH:mm' }}
-          </small>
+          <small><i class="bi bi-person"></i> 创建者: {{ group.createdBy.name }}</small>
+          <small><i class="bi bi-calendar"></i> {{ group.createdAt | date:'yyyy-MM-dd HH:mm' }}</small>
         </div>
 
         <div class="users-section" *ngIf="group.users && group.users.length > 0">
-          <h4>群组成员 ({{ group.users.length }})</h4>
+          <h4><i class="bi bi-people"></i> 群组成员 ({{ group.users.length }})</h4>
           <div class="users-grid">
             <div class="user-item" *ngFor="let user of group.users">
               <i class="bi bi-person-circle"></i>
               <div class="user-info">
                 <span class="user-name">{{ user.name }}</span>
                 <span class="user-email">{{ user.email }}</span>
-                <span class="user-company" *ngIf="user.company">{{ user.company }}</span>
+                <span *ngIf="user.company" class="user-company">{{ user.company }}</span>
               </div>
             </div>
           </div>
@@ -369,262 +69,203 @@
   </div>
 
   <!-- 空状态 -->
-  <div *ngIf="!loading && groups.length === 0" class="empty-state">
-    <i class="bi bi-people"></i>
-    <h3>暂无群组</h3>
-    <p *ngIf="authService.hasRole(['admin', 'quoter'])">点击上方按钮创建第一个群组</p>
+  <div *ngIf="!loading && groups.length === 0" class="text-center py-5">
+    <i class="bi bi-people fs-1 text-muted"></i>
+    <h3 class="mt-3">暂无群组</h3>
+    <p *ngIf="authService.hasRole(['admin', 'quoter'])" class="text-muted">
+      点击上方按钮创建第一个群组
+    </p>
   </div>
 </div>
 
 <!-- 创建群组模态框 -->
-<ng-container *ngIf="showCreateModal">
-  <div class="modal-overlay" (click)="closeCreateModal()" 
-       style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; background: rgba(0,0,0,0.4) !important; display: block !important; z-index: 9999999 !important; margin: 0 !important; padding: 0 !important; border: none !important;">
-    <div class="modal create-modal" (click)="$event.stopPropagation()"
-         style="background: white !important; border: 5px solid #28a745 !important; border-radius: 8px !important; padding: 20px !important; max-width: 500px !important; width: 90% !important; z-index: 10000000 !important; position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; margin: 0 !important; box-shadow: 0 0 50px rgba(0,0,0,0.8) !important;">
-    <div class="modal-header">
-      <div class="modal-title">
-        <i class="bi bi-plus-circle-fill text-success me-2"></i>
-        <span>创建新群组</span>
+<div class="modal fade" [class.show]="showCreateModal" [style.display]="showCreateModal ? 'block' : 'none'" 
+     [class.d-block]="showCreateModal" tabindex="-1" (click)="closeCreateModal()">
+  <div class="modal-dialog modal-dialog-centered" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-plus-circle-fill text-success me-2"></i>创建新群组
+        </h5>
+        <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
-      <button type="button" class="btn-close" (click)="closeCreateModal()" aria-label="关闭">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>
-    
-    <div class="modal-body">
-      <form (ngSubmit)="createGroup()">
-        <div class="form-group">
-          <label for="groupName" class="form-label">
-            <i class="bi bi-tag me-2"></i>群组名称 <span class="text-danger">*</span>
-          </label>
-          <div class="input-group">
-            <span class="input-group-text">
-              <i class="bi bi-hash"></i>
-            </span>
-            <input 
-              type="text" 
-              class="form-control"
-              id="groupName"
-              [(ngModel)]="groupForm.name" 
-              name="name" 
-              required
-              placeholder="请输入群组名称，例如：电子元件供应商">
+      <div class="modal-body">
+        <form (ngSubmit)="createGroup()">
+          <div class="mb-3">
+            <label for="groupName" class="form-label">
+              群组名称 <span class="text-danger">*</span>
+            </label>
+            <input type="text" class="form-control" id="groupName" 
+                   [(ngModel)]="groupForm.name" name="name" required 
+                   placeholder="请输入群组名称，例如：电子元件供应商">
           </div>
-        </div>
-        
-        <div class="form-group">
-          <label for="groupDescription" class="form-label">
-            <i class="bi bi-text-paragraph me-2"></i>群组描述
-          </label>
-          <textarea 
-            class="form-control"
-            id="groupDescription"
-            [(ngModel)]="groupForm.description" 
-            name="description"
-            rows="3"
-            placeholder="请输入群组描述（可选）"></textarea>
-        </div>
-        
-
-        
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" (click)="closeCreateModal()">
-            <i class="bi bi-x-circle me-2"></i>取消
-          </button>
-          <button type="submit" class="btn btn-success">
-            <i class="bi bi-plus-circle me-2"></i>创建群组
-          </button>
-        </div>
-      </form>
+          
+          <div class="mb-3">
+            <label for="groupDescription" class="form-label">群组描述</label>
+            <textarea class="form-control" id="groupDescription" rows="3"
+                      [(ngModel)]="groupForm.description" name="description"
+                      placeholder="请输入群组描述（可选）"></textarea>
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeCreateModal()">
+              <i class="bi bi-x-circle me-2"></i>取消
+            </button>
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-plus-circle me-2"></i>创建群组
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
-  </div>
-</ng-container>
+</div>
 
 <!-- 编辑群组模态框 -->
-<ng-container *ngIf="showEditModal">
-  <div class="modal-overlay" (click)="closeEditModal()"
-       style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; background: rgba(0,0,0,0.4) !important; display: block !important; z-index: 9999999 !important; margin: 0 !important; padding: 0 !important; border: none !important;">
-    <div class="modal edit-modal" (click)="$event.stopPropagation()"
-         style="background: white !important; border: 5px solid #007bff !important; border-radius: 8px !important; padding: 20px !important; max-width: 500px !important; width: 90% !important; z-index: 10000000 !important; position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; margin: 0 !important; box-shadow: 0 0 50px rgba(0,0,0,0.8) !important;">
-    <div class="modal-header">
-      <div class="modal-title">
-        <i class="bi bi-pencil-square text-primary me-2"></i>
-        <span>编辑群组</span>
+<div class="modal fade" [class.show]="showEditModal" [style.display]="showEditModal ? 'block' : 'none'" 
+     [class.d-block]="showEditModal" tabindex="-1" (click)="closeEditModal()">
+  <div class="modal-dialog modal-dialog-centered" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-pencil-square text-primary me-2"></i>编辑群组
+        </h5>
+        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
       </div>
-      <button type="button" class="btn-close" (click)="closeEditModal()" aria-label="关闭">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>
-    
-    <div class="modal-body">
-      <div class="current-group-info">
-        <div class="info-item">
-          <span class="info-label">当前群组:</span>
-          <span class="info-value">{{ editForm.name }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">创建时间:</span>
-          <span class="info-value">{{ selectedGroup?.createdAt | date:'yyyy-MM-dd' }}</span>
-        </div>
-      </div>
-      
-      <form (ngSubmit)="updateGroup()">
-        <div class="form-group">
-          <label for="editGroupName" class="form-label">
-            <i class="bi bi-tag me-2"></i>群组名称 <span class="text-danger">*</span>
-          </label>
-          <div class="input-group">
-            <span class="input-group-text">
-              <i class="bi bi-hash"></i>
-            </span>
-            <input 
-              type="text" 
-              class="form-control"
-              id="editGroupName"
-              [(ngModel)]="editForm.name" 
-              name="name" 
-              required
-              placeholder="请输入群组名称">
+      <div class="modal-body">
+        <div class="alert alert-info">
+          <div class="d-flex justify-content-between">
+            <span class="fw-bold">当前群组:</span>
+            <span>{{ editForm.name }}</span>
+          </div>
+          <div class="d-flex justify-content-between mt-1">
+            <span class="fw-bold">创建时间:</span>
+            <span>{{ selectedGroup?.createdAt | date:'yyyy-MM-dd' }}</span>
           </div>
         </div>
         
-        <div class="form-group">
-          <label for="editGroupDescription" class="form-label">
-            <i class="bi bi-text-paragraph me-2"></i>群组描述
-          </label>
-          <textarea 
-            class="form-control"
-            id="editGroupDescription"
-            [(ngModel)]="editForm.description" 
-            name="description"
-            rows="3"
-            placeholder="请输入群组描述（可选）"></textarea>
+        <form (ngSubmit)="updateGroup()">
+          <div class="mb-3">
+            <label for="editGroupName" class="form-label">
+              群组名称 <span class="text-danger">*</span>
+            </label>
+            <input type="text" class="form-control" id="editGroupName" 
+                   [(ngModel)]="editForm.name" name="name" required 
+                   placeholder="请输入群组名称">
+          </div>
+          
+          <div class="mb-3">
+            <label for="editGroupDescription" class="form-label">群组描述</label>
+            <textarea class="form-control" id="editGroupDescription" rows="3"
+                      [(ngModel)]="editForm.description" name="description"
+                      placeholder="请输入群组描述（可选）"></textarea>
+          </div>
+          
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="editGroupActive"
+                     [(ngModel)]="editForm.isActive" name="isActive">
+              <label class="form-check-label" for="editGroupActive">
+                <i class="bi bi-power me-2"></i>启用群组
+                <div class="form-text">禁用后，该群组将无法被分配新的询价单</div>
+              </label>
+            </div>
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeEditModal()">
+              <i class="bi bi-x-circle me-2"></i>取消
+            </button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle me-2"></i>保存修改
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 分配用户模态框 -->
+<div class="modal fade" [class.show]="showAssignModal" [style.display]="showAssignModal ? 'block' : 'none'" 
+     [class.d-block]="showAssignModal" tabindex="-1" (click)="closeAssignModal()">
+  <div class="modal-dialog modal-dialog-centered modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-people-fill text-info me-2"></i>分配供应商到群组
+        </h5>
+        <button type="button" class="btn-close" (click)="closeAssignModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info d-flex justify-content-between align-items-center">
+          <div>
+            <i class="bi bi-tag-fill me-2"></i>
+            <strong>{{ selectedGroup?.name }}</strong>
+          </div>
+          <div>
+            <i class="bi bi-check-circle-fill text-success me-1"></i>
+            已选择 <strong>{{ selectedSuppliers.length }}</strong> 个供应商
+          </div>
         </div>
         
-
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+            <input type="text" class="form-control" placeholder="搜索供应商姓名、邮箱或公司..."
+                   (input)="filterSuppliers($event)">
+          </div>
+        </div>
         
-        <div class="form-group">
-          <div class="form-check form-switch">
-            <input 
-              class="form-check-input" 
-              type="checkbox" 
-              id="editGroupActive"
-              [(ngModel)]="editForm.isActive" 
-              name="isActive">
-            <label class="form-check-label" for="editGroupActive">
-              <i class="bi bi-power me-2"></i>启用群组
-              <small class="text-muted d-block">禁用后，该群组将无法被分配新的询价单</small>
-            </label>
+        <div style="max-height: 300px; overflow-y: auto;">
+          <div *ngIf="filteredSuppliers.length === 0" class="text-center py-4 text-muted">
+            <i class="bi bi-search fs-1"></i>
+            <p class="mt-2">未找到匹配的供应商</p>
+          </div>
+          
+          <div class="list-group" *ngIf="filteredSuppliers.length > 0">
+            <div class="list-group-item" *ngFor="let supplier of filteredSuppliers">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" 
+                       [value]="supplier._id"
+                       [checked]="selectedSuppliers.includes(supplier._id)"
+                       (change)="onSupplierSelectionChange($event)"
+                       [id]="'supplier-' + supplier._id">
+                <label class="form-check-label d-flex align-items-center w-100" 
+                       [for]="'supplier-' + supplier._id">
+                  <i class="bi bi-person-circle fs-4 me-3 text-muted"></i>
+                  <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <strong>{{ supplier.name }}</strong>
+                      <span class="badge bg-success">活跃</span>
+                    </div>
+                    <div class="small text-muted">{{ supplier.email }}</div>
+                    <div *ngIf="supplier.company" class="small text-muted">
+                      <i class="bi bi-building me-1"></i>{{ supplier.company }}
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
         
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" (click)="closeEditModal()">
+          <button type="button" class="btn btn-secondary" (click)="closeAssignModal()">
             <i class="bi bi-x-circle me-2"></i>取消
           </button>
-          <button type="submit" class="btn btn-primary">
-            <i class="bi bi-check-circle me-2"></i>保存修改
+          <button type="button" class="btn btn-info" (click)="assignUsersToGroup()">
+            <i class="bi bi-people-plus me-2"></i>确认更新成员
+            <span *ngIf="selectedSuppliers.length > 0">({{ selectedSuppliers.length }})</span>
           </button>
         </div>
-      </form>
+      </div>
     </div>
   </div>
-  </div>
-</ng-container>
+</div>
 
-<!-- 分配用户模态框 -->
-<ng-container *ngIf="showAssignModal">
-  <div class="modal-overlay" (click)="closeAssignModal()"
-       style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; background: rgba(0,0,0,0.4) !important; display: block !important; z-index: 9999999 !important; margin: 0 !important; padding: 0 !important; border: none !important;">
-    <div class="modal assign-modal" (click)="$event.stopPropagation()"
-         style="background: white !important; border: 5px solid #17a2b8 !important; border-radius: 8px !important; padding: 20px !important; max-width: 700px !important; width: 90% !important; z-index: 10000000 !important; position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; margin: 0 !important; box-shadow: 0 0 50px rgba(0,0,0,0.8) !important;">
-    <div class="modal-header">
-      <div class="modal-title">
-        <i class="bi bi-people-fill text-info me-2"></i>
-        <span>分配供应商到群组</span>
-      </div>
-      <button type="button" class="btn-close" (click)="closeAssignModal()" aria-label="关闭">
-        <i class="bi bi-x-lg"></i>
-      </button>
-    </div>
-    
-    <div class="modal-body">
-      <div class="group-info-bar">
-        <div class="group-badge" style="background-color: #17a2b8;">
-          <i class="bi bi-tag-fill me-2"></i>{{ selectedGroup?.name }}
-        </div>
-        <div class="selection-summary">
-          <i class="bi bi-check-circle-fill text-success"></i>
-          <span>已选择 <strong>{{ selectedSuppliers.length }}</strong> 个供应商</span>
-        </div>
-      </div>
-      
-      <div class="search-section">
-        <div class="input-group search-box">
-          <span class="input-group-text">
-            <i class="bi bi-search"></i>
-          </span>
-          <input 
-            type="text" 
-            class="form-control"
-            placeholder="搜索供应商姓名、邮箱或公司..."
-            #searchInput
-            (input)="filterSuppliers($event)">
-        </div>
-      </div>
-      
-      <div class="suppliers-list">
-        <div *ngIf="filteredSuppliers.length === 0" class="empty-state">
-          <i class="bi bi-search"></i>
-          <p>未找到匹配的供应商</p>
-        </div>
-        
-        <div *ngFor="let supplier of filteredSuppliers" class="supplier-item" 
-             [class.selected]="selectedSuppliers.includes(supplier._id)">
-          <label class="supplier-card">
-            <div class="supplier-checkbox">
-              <input 
-                type="checkbox" 
-                class="form-check-input"
-                [value]="supplier._id"
-                [checked]="selectedSuppliers.includes(supplier._id)"
-                (change)="onSupplierSelectionChange($event)">
-              <span class="checkmark"></span>
-            </div>
-            
-            <div class="supplier-info">
-              <div class="supplier-avatar">
-                <i class="bi bi-person-circle"></i>
-              </div>
-              <div class="supplier-details">
-                <div class="supplier-name">
-                  <strong>{{ supplier.name }}</strong>
-                  <span class="supplier-status badge bg-success">活跃</span>
-                </div>
-                <div class="supplier-email">
-                  <i class="bi bi-envelope me-1"></i>{{ supplier.email }}
-                </div>
-                <div class="supplier-company" *ngIf="supplier.company">
-                  <i class="bi bi-building me-1"></i>{{ supplier.company }}
-                </div>
-              </div>
-            </div>
-          </label>
-        </div>
-      </div>
-      
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" (click)="closeAssignModal()">
-          <i class="bi bi-x-circle me-2"></i>取消
-        </button>
-        <button type="button" class="btn btn-info" (click)="assignUsersToGroup()">
-          <i class="bi bi-people-plus me-2"></i>确认更新成员
-          <span *ngIf="selectedSuppliers.length > 0">({{ selectedSuppliers.length }})</span>
-        </button>
-      </div>
-    </div>
-  </div>
-  </div>
-</ng-container>
+<!-- 模态框背景遮罩 -->
+<div class="modal-backdrop fade" [class.show]="showCreateModal || showEditModal || showAssignModal" 
+     [style.display]="(showCreateModal || showEditModal || showAssignModal) ? 'block' : 'none'"></div>
