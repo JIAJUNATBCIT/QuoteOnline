@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
-import { environment } from '../../environments/environment';
+
 import { User, AuthResponse } from '../utils/user.types';
 import { TokenService } from './token.service';
 import { Router } from '@angular/router';
@@ -38,7 +38,7 @@ export class AuthService {
   }
 
   login(email: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/login`, { email, password })
+    return this.http.post<AuthResponse>(`/api/auth/login`, { email, password })
       .pipe(
         tap(response => {
           if (response.accessToken && response.refreshToken && response.user) {
@@ -51,7 +51,7 @@ export class AuthService {
   }
 
   register(userData: any): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/register`, userData)
+    return this.http.post<AuthResponse>(`/api/auth/register`, userData)
       .pipe(
         tap(response => {
           if (response.accessToken && response.refreshToken && response.user) {
@@ -94,10 +94,10 @@ export class AuthService {
   }
 
   forgotPassword(email: string): Observable<any> {
-    return this.http.post(`${environment.apiUrl}/auth/forgot-password`, { email });
+    return this.http.post(`/api/auth/forgot-password`, { email });
   }
 
   resetPassword(token: string, newPassword: string): Observable<any> {
-    return this.http.post(`${environment.apiUrl}/auth/reset-password`, { token, newPassword });
+    return this.http.post(`/api/auth/reset-password`, { token, newPassword });
   }
 }

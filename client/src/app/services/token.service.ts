@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, timer, fromEvent, of } from 'rxjs';
 import { switchMap, catchError, take, startWith } from 'rxjs/operators';
-import { environment } from '../../environments/environment';
+
 import { TokenResponse } from '../utils/user.types';
 
 @Injectable({
@@ -104,7 +104,7 @@ export class TokenService {
       'X-Skip-Interceptor': 'true' // 添加自定义头部标识
     };
     
-    return this.http.post<TokenResponse>(`${environment.apiUrl}/auth/refresh`, {}, { headers }).pipe(
+    return this.http.post<TokenResponse>(`/api/auth/refresh`, {}, { headers }).pipe(
       switchMap((response: TokenResponse) => {
         this.isRefreshing = false;
         this.setAccessToken(response.accessToken);

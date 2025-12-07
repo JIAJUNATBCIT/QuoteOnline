@@ -7,7 +7,7 @@ import { PermissionService } from '../../services/permission.service';
 import { TokenService } from '../../services/token.service';
 import { getStatusDisplayName } from '../../utils/status.utils';
 import { FileUtils, TempFile } from '../../utils/file.utils';
-import { environment } from '../../../environments/environment';
+
 import { GroupService, Group } from '../../services/group.service';
 
 @Component({
@@ -485,7 +485,7 @@ export class QuoteDetailComponent implements OnInit {
     
     // 配置请求
     xhr.timeout = 120000; // 2分钟超时（多文件需要更长时间）
-    xhr.open('PUT', `${environment.apiUrl}/quotes/${this.quote._id}`);
+    xhr.open('PUT', `/api/quotes/${this.quote._id}`);
     
     // 添加认证头 - 使用TokenService获取正确的token
     const token = this.tokenService.getAccessToken();
