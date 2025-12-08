@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
@@ -918,27 +918,34 @@ const EmailTemplates = {
   `
 };
 
-// Create transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: true, // Use SSL for port 465
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false   // 关键：禁止验证证书
-  },
-  connectionTimeout: 60000,     // 60秒连接超时（增加）
-  greetingTimeout: 15000,       // 15秒握手超时（增加）
-  socketTimeout: 120000,        // 120秒socket超时（增加）
-  pool: true,                   // 启用连接池
-  maxConnections: 5,            // 最大连接数
-  maxMessages: 100,             // 每个连接最大消息数
-  rateDelta: 1000,              // 发送速率限制
-  rateLimit: 5                  // 每秒最多发送5封邮件
-});
+// Initialize SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+// Helper function to create attachments for SendGrid
+const createAttachments = (files) => {
+  if (!files || files.length === 0) return [];
+  
+  return files.map(file => {
+    if (file.path) {
+      try {
+        const fileContent = fs.readFileSync(file.path);
+        return {
+          filename: file.originalName,
+          content: fileContent.toString('base64'),
+          type: file.mimetype || 'application/octet-stream',
+          disposition: 'attachment'
+        };
+      } catch (error) {
+        logger.error('读取文件失败', { 
+          error: error.message,
+          filename: file.originalName
+        });
+        return null;
+      }
+    }
+    return null;
+  }).filter(Boolean);
+};
 
 // Send quote notification to quoters
 const sendQuoteNotification = async (quoterEmail, quote) => {
@@ -950,46 +957,12 @@ const sendQuoteNotification = async (quoterEmail, quote) => {
       to: quoterEmail,
       subject: `新的询价请求 - ${quote.quoteNumber} - ${quote.title}`,
       html: EmailTemplates.quoteNotification(quote),
-      attachments: (quote.customerFiles && quote.customerFiles.length > 0) ? (() => {
-        try {
-          const files = quote.customerFiles;
-          const attachments = [];
-          
-          for (const file of files) {
-            if (file.path) {
-              // 尝试读取文件内容
-              const fileContent = fs.readFileSync(file.path);
-              
-              logger.info('使用客户文件附件', { 
-                originalName: file.originalName,
-                fileSize: fileContent.length
-              });
-              
-              attachments.push({
-                filename: file.originalName,
-                content: fileContent
-              });
-            }
-          }
-          
-          logger.info('发送客户文件附件', { 
-            fileCount: attachments.length
-          });
-          
-          return attachments;
-        } catch (error) {
-          logger.error('读取客户文件失败', { 
-            error: error.message 
-          });
-          return [];
-        }
-      })() : []
+      attachments: createAttachments(quote.customerFiles)
     };
 
-    const result = await transporter.sendMail(mailOptions);
+    const result = await sgMail.send(mailOptions);
     const endTime = Date.now();
     
-    // 记录邮件发送日志
     logger.email('发送', quoterEmail, quote.quoteNumber, true, null);
     
     return result;
@@ -1009,51 +982,17 @@ const sendQuoteResponse = async (customerEmail, quote) => {
       to: customerEmail,
       subject: `报价回复 - ${quote.quoteNumber} - ${quote.title}`,
       html: EmailTemplates.quoteResponse(quote),
-      attachments: (quote.quoterFiles && quote.quoterFiles.length > 0) ? (() => {
-        try {
-          const files = quote.quoterFiles;
-          const attachments = [];
-          
-          for (const file of files) {
-            if (file.path) {
-              // 尝试读取文件内容
-              const fileContent = fs.readFileSync(file.path);
-              
-              logger.info('使用报价员文件附件', { 
-                originalName: file.originalName,
-                fileSize: fileContent.length
-              });
-              
-              attachments.push({
-                filename: file.originalName,
-                content: fileContent
-              });
-            }
-          }
-          
-          logger.info('发送报价员文件附件', { 
-            fileCount: attachments.length
-          });
-          
-          return attachments;
-        } catch (error) {
-          logger.error('读取报价员文件失败', { 
-            error: error.message 
-          });
-          return [];
-        }
-      })() : []
+      attachments: createAttachments(quote.quoterFiles)
     };
 
-    const result = await transporter.sendMail(mailOptions);
+    const result = await sgMail.send(mailOptions);
     const endTime = Date.now();
     
-    // 记录邮件发送日志
-    logger.email('发送', quoterEmail, quote.quoteNumber, true, null);
+    logger.email('发送', customerEmail, quote.quoteNumber, true, null);
     
     return result;
   } catch (error) {
-    logger.email('发送', quoterEmail, quote.quoteNumber, false, error);
+    logger.email('发送', customerEmail, quote.quoteNumber, false, error);
     throw new Error(`邮件发送失败: ${error.message}`);
   }
 };
@@ -1064,9 +1003,6 @@ const sendPasswordReset = async (email, resetToken) => {
     const startTime = Date.now();
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
     
-    console.log('发送密码重置邮件到:', email);
-    console.log('重置链接:', resetUrl);
-    
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
@@ -1074,17 +1010,14 @@ const sendPasswordReset = async (email, resetToken) => {
       html: EmailTemplates.passwordReset(resetUrl)
     };
 
-    const result = await transporter.sendMail(mailOptions);
+    const result = await sgMail.send(mailOptions);
     const endTime = Date.now();
     
-    // 记录邮件发送日志
     logger.info('密码重置邮件发送成功', {
       to: email,
-      messageId: result.messageId,
+      messageId: result[0]?.headers?.['x-message-id'],
       duration: endTime - startTime
     });
-    
-    console.log('邮件发送成功, Message ID:', result.messageId);
     
     return result;
   } catch (error) {
@@ -1092,7 +1025,6 @@ const sendPasswordReset = async (email, resetToken) => {
       to: email,
       error: error.message
     });
-    console.error('发送密码重置邮件失败:', error);
     throw new Error(`密码重置邮件发送失败: ${error.message}`);
   }
 };
@@ -1108,7 +1040,7 @@ const sendQuoterAssignmentNotification = async (quoterEmail, quote) => {
       html: EmailTemplates.quoterAssignmentNotification(quote)
     };
 
-    const result = await transporter.sendMail(mailOptions);
+    const result = await sgMail.send(mailOptions);
     
     logger.email('发送', quoterEmail, quote.quoteNumber, true, null);
     
@@ -1124,45 +1056,21 @@ const sendSupplierQuoteNotification = async (quoterEmail, quote) => {
   const startTime = Date.now();
   
   try {
-    const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: process.env.EMAIL_PORT,
-      secure: true, // Use SSL for port 465
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      tls: {
-        rejectUnauthorized: false   // 关键：禁止验证证书
-      },
-      connectionTimeout: 30000,     // 30秒连接超时
-      greetingTimeout: 10000,       // 10秒握手超时
-      socketTimeout: 60000          // 60秒socket超时
-    });
-    
     const mailOptions = {
-      from: `"询价系统" <${process.env.EMAIL_USER}>`,
+      from: process.env.EMAIL_FROM,
       to: quoterEmail,
       subject: `供应商报价通知 - ${quote.quoteNumber}`,
       html: EmailTemplates.supplierQuoteNotification(quote)
     };
 
-    const result = await transporter.sendMail(mailOptions);
+    const result = await sgMail.send(mailOptions);
     const endTime = Date.now();
     
-    logger.info('供应商报价通知邮件发送成功', {
-      to: quoterEmail,
-      quoteNumber: quote.quoteNumber,
-      messageId: result.messageId,
-      duration: endTime - startTime
-    });
+    logger.email('发送', quoterEmail, quote.quoteNumber, true, null);
     
     return result;
   } catch (error) {
-    logger.error('发送供应商报价通知邮件失败', {
-      to: quoterEmail,
-      error: error.message
-    });
+    logger.email('发送', quoterEmail, quote.quoteNumber, false, error);
     throw new Error(`供应商报价通知邮件发送失败: ${error.message}`);
   }
 };
@@ -1179,10 +1087,9 @@ const sendSupplierQuotedNotification = async (quoterEmail, quote) => {
       html: EmailTemplates.supplierQuotedNotification(quote)
     };
 
-    const result = await transporter.sendMail(mailOptions);
+    const result = await sgMail.send(mailOptions);
     const endTime = Date.now();
     
-    // 记录邮件发送日志
     logger.email('发送', quoterEmail, quote.quoteNumber, true, null);
     
     return result;
@@ -1202,42 +1109,12 @@ const sendFinalQuoteNotification = async (customerEmail, quote) => {
       to: customerEmail,
       subject: `最终报价已确认 - ${quote.quoteNumber} - ${quote.title}`,
       html: EmailTemplates.finalQuoteNotification(quote),
-      attachments: (quote.quoterFiles && quote.quoterFiles.length > 0) ? (() => {
-        try {
-          const files = quote.quoterFiles;
-          const attachments = [];
-          
-          for (const file of files) {
-            if (file.path) {
-              // 尝试读取文件内容
-              const fileContent = fs.readFileSync(file.path);
-              
-              logger.info('使用最终报价文件附件', { 
-                originalName: file.originalName,
-                fileSize: fileContent.length
-              });
-              
-              attachments.push({
-                filename: file.originalName,
-                content: fileContent
-              });
-            }
-          }
-          
-          return attachments;
-        } catch (error) {
-          logger.error('读取最终报价文件失败', { 
-            error: error.message 
-          });
-          return [];
-        }
-      })() : []
+      attachments: createAttachments(quote.quoterFiles)
     };
 
-    const result = await transporter.sendMail(mailOptions);
+    const result = await sgMail.send(mailOptions);
     const endTime = Date.now();
     
-    // 记录邮件发送日志
     logger.email('发送', customerEmail, quote.quoteNumber, true, null);
     
     return result;
