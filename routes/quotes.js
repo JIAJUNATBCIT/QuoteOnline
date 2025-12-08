@@ -176,7 +176,7 @@ router.post('/', auth, authorize('customer'), upload.fields([
     logger.database('保存询价单', 'quotes', { quoteNumber: quote.quoteNumber }, Date.now() - saveStartTime);
 
     // 异步发送邮件通知报价员分配供应商，不阻塞响应
-    setImmediate(async () => {
+    setTimeout(async () => {
       try {
         const quoters = await User.find({ role: 'quoter', isActive: true })
           .select('email')
@@ -203,7 +203,25 @@ router.post('/', auth, authorize('customer'), upload.fields([
             .catch(error => logger.error(`发送邮件给报价员 ${quoter.email} 失败`, { error: error.message }))
         );
         
-        const results = await Promise.allSettled(emailPromises);
+        const results = await /* 串行发送避免超时 */
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (const quoter of quoters) {
+          try {
+            await Promise.race([
+              emailService.sendQuoterAssignmentNotification(quoter.email, sanitizedQuote),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('邮件发送超时')), 45000)
+              )
+            ]);
+            successCount++;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } catch (error) {
+            failCount++;
+            logger.error(`发送邮件给报价员 ${quoter.email} 失败`, { error: error.message });
+          }
+        };
         const successCount = results.filter(r => r.status === 'fulfilled').length;
         const failCount = results.length - successCount;
         

@@ -930,9 +930,14 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false   // 关键：禁止验证证书
   },
-  connectionTimeout: 30000,     // 30秒连接超时
-  greetingTimeout: 10000,       // 10秒握手超时
-  socketTimeout: 60000          // 60秒socket超时
+  connectionTimeout: 60000,     // 60秒连接超时（增加）
+  greetingTimeout: 15000,       // 15秒握手超时（增加）
+  socketTimeout: 120000,        // 120秒socket超时（增加）
+  pool: true,                   // 启用连接池
+  maxConnections: 5,            // 最大连接数
+  maxMessages: 100,             // 每个连接最大消息数
+  rateDelta: 1000,              // 发送速率限制
+  rateLimit: 5                  // 每秒最多发送5封邮件
 });
 
 // Send quote notification to quoters
