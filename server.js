@@ -111,25 +111,31 @@ server.keepAliveTimeout = 65000; // 65秒
 server.headersTimeout = 66000; // 66秒
 
 // 优雅关闭
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   logger.info('收到 SIGTERM 信号，开始优雅关闭...');
-  server.close(() => {
+  server.close(async () => {
     logger.info('HTTP 服务器已关闭');
-    mongoose.connection.close(false, () => {
+    try {
+      await mongoose.connection.close();
       logger.info('MongoDB 连接已关闭');
-      process.exit(0);
-    });
+    } catch (error) {
+      logger.error('关闭 MongoDB 连接时出错', { error: error.message });
+    }
+    process.exit(0);
   });
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   logger.info('收到 SIGINT 信号，开始优雅关闭...');
-  server.close(() => {
+  server.close(async () => {
     logger.info('HTTP 服务器已关闭');
-    mongoose.connection.close(false, () => {
+    try {
+      await mongoose.connection.close();
       logger.info('MongoDB 连接已关闭');
-      process.exit(0);
-    });
+    } catch (error) {
+      logger.error('关闭 MongoDB 连接时出错', { error: error.message });
+    }
+    process.exit(0);
   });
 });
 
