@@ -175,7 +175,7 @@ router.post('/', auth, authorize('customer'), upload.fields([
     await quote.populate('customer', 'name email company');
     logger.database('保存询价单', 'quotes', { quoteNumber: quote.quoteNumber }, Date.now() - saveStartTime);
 
-    // 异步发送邮件通知报价员分配供应商，使用简化的发送方式
+    // 异步发送邮件通知报价员分配供应商，不阻塞响应
     setTimeout(async () => {
       try {
         const quoters = await User.find({ role: 'quoter', isActive: true })
@@ -195,24 +195,28 @@ router.post('/', auth, authorize('customer'), upload.fields([
           description: quote.description,
           createdAt: quote.createdAt,
           customerFiles: quote.customerFiles
+          // 注意：不包含 customer 字段，保护客户隐私
         };
 
-        logger.info(`开始发送询价单 ${quote.quoteNumber} 的通知邮件给 ${quoters.length} 个报价员`);
+        const emailPromises = quoters.map(quoter => 
+          emailService.sendQuoterAssignmentNotification(quoter.email, sanitizedQuote)
+            .catch(error => logger.error(`发送邮件给报价员 ${quoter.email} 失败`, { error: error.message }))
+        );
         
-        // 简化发送方式 - 串行发送，避免并发问题
+        // 串行发送避免超时
         let successCount = 0;
         let failCount = 0;
         
         for (const quoter of quoters) {
           try {
-            await emailService.sendQuoterAssignmentNotification(quoter.email, sanitizedQuote);
+            await Promise.race([
+              emailService.sendQuoterAssignmentNotification(quoter.email, sanitizedQuote),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('邮件发送超时')), 45000)
+              )
+            ]);
             successCount++;
-            logger.info(`成功发送邮件给报价员 ${quoter.email}`);
-            
-            // 发送间隔1秒，避免被邮件服务器限制
-            if (quoters.indexOf(quoter) < quoters.length - 1) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
           } catch (error) {
             failCount++;
             logger.error(`发送邮件给报价员 ${quoter.email} 失败`, { error: error.message });
@@ -227,7 +231,7 @@ router.post('/', auth, authorize('customer'), upload.fields([
       } catch (error) {
         logger.error('批量发送报价员邮件失败', { error: error.message, stack: error.stack });
       }
-    }, 2000); // 延迟2秒发送，确保询价单保存完成
+    });
 
     const totalTime = Date.now() - startTime;
     logger.request(req, totalTime);

@@ -918,35 +918,26 @@ const EmailTemplates = {
   `
 };
 
-// Create transporter - 移除连接池配置以避免超时问题
+// Create transporter
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.exmail.qq.com',
-  port: parseInt(process.env.EMAIL_PORT) || 465,
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
   secure: true, // Use SSL for port 465
   auth: {
-    user: process.env.EMAIL_USER || 'sales@junbclistings.com',
-    pass: process.env.EMAIL_PASS || '8vaFF4XZWqJGZWCn',
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
   tls: {
     rejectUnauthorized: false   // 关键：禁止验证证书
   },
-  connectionTimeout: 15000,     // 15秒连接超时（减少）
-  greetingTimeout: 5000,        // 5秒握手超时（减少）
-  socketTimeout: 30000,         // 30秒socket超时（减少）
-  // 移除连接池配置，避免连接复用导致的超时问题
-  // pool: true,
-  // maxConnections: 5,
-  // maxMessages: 100,
-  // rateDelta: 1000,
-  // rateLimit: 5
-});
-
-// 启动时记录邮件配置（隐藏敏感信息）
-logger.info('邮件服务初始化', {
-  host: process.env.EMAIL_HOST || 'smtp.exmail.qq.com',
-  port: process.env.EMAIL_PORT || 465,
-  user: process.env.EMAIL_USER ? process.env.EMAIL_USER.replace(/(.{2}).*(@.*)/, '$1***$2') : 'sales@***.com',
-  hasPass: !!process.env.EMAIL_PASS
+  connectionTimeout: 60000,     // 60秒连接超时（增加）
+  greetingTimeout: 15000,       // 15秒握手超时（增加）
+  socketTimeout: 120000,        // 120秒socket超时（增加）
+  pool: true,                   // 启用连接池
+  maxConnections: 5,            // 最大连接数
+  maxMessages: 100,             // 每个连接最大消息数
+  rateDelta: 1000,              // 发送速率限制
+  rateLimit: 5                  // 每秒最多发送5封邮件
 });
 
 // Send quote notification to quoters
