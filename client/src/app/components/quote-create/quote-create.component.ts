@@ -82,7 +82,7 @@ export class QuoteCreateComponent {
 
     this.quoteService.createQuote(formData).subscribe({
       next: () => {
-        this.router.navigate(['/quotes']);
+        this.router.navigate(['/dashboard']);
       },
       error: (error) => {
         this.error = error.error?.message || '创建询价单失败';
