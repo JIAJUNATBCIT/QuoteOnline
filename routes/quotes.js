@@ -198,10 +198,7 @@ router.post('/', auth, authorize('customer'), upload.fields([
           // 注意：不包含 customer 字段，保护客户隐私
         };
 
-        const emailPromises = quoters.map(quoter => 
-          emailService.sendQuoterAssignmentNotification(quoter.email, sanitizedQuote)
-            .catch(error => logger.error(`发送邮件给报价员 ${quoter.email} 失败`, { error: error.message }))
-        );
+        // 避免重复发送，删除并行发送逻辑
         
         // 串行发送避免超时
         let successCount = 0;
