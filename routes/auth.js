@@ -191,7 +191,7 @@ router.post('/forgot-password', async (req, res) => {
     );
 
     // Send password reset email
-    const emailService = require('../services/emailService');
+    const emailService = require('../services/mailgunService');
     await emailService.sendPasswordReset(email, resetToken);
 
     res.json({ 
