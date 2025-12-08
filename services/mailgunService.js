@@ -200,7 +200,8 @@ const sendSupplierQuotedNotification = async (quoterEmail, quote) => {
       from: process.env.EMAIL_FROM || 'sales@junbclistings.com',
       to: quoterEmail,
       subject: `供应商已报价 - ${quote.quoteNumber} - ${quote.title}`,
-      html: EmailTemplates.supplierQuotedNotification(quote)
+      html: EmailTemplates.supplierQuotedNotification(quote),
+      attachment: createAttachments(quote.supplierFiles || [])
     };
 
     const result = await client.messages.create(DOMAIN, messageData);
@@ -386,7 +387,52 @@ const EmailTemplates = {
   `,
 
   // 其他模板保持不变，这里省略...
-  quoteResponse: (quote) => `<!-- quoteResponse template -->`,
+  quoteResponse: (quote) => {
+    const content = `
+      <div class="header">
+        <h1>✅ 报价回复</h1>
+      </div>
+      
+      <div class="content">
+        <div class="info-box">
+          <div class="info-row">
+            <span class="info-label">询价号:</span>
+            <span class="info-value quote-number">${escape(quote.quoteNumber)}</span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">标题:</span>
+            <span class="info-value">${escape(quote.title)}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">报价:</span>
+            <span class="info-value price">${quote.price ? `${quote.price} ${quote.currency}` : '已报价'}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">报价员留言:</span>
+            <span class="info-value">${escape(quote.quoterMessage) || '无'}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">有效期至:</span>
+            <span class="info-value">${quote.validUntil ? quote.validUntil.toLocaleString('zh-CN') : '无限制'}</span>
+          </div>
+        </div>
+        
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL || '#'}/quote-view/${quote._id}" class="action-button">
+            查看报价详情
+          </a>
+        </p>
+      </div>
+      
+      <div class="footer">
+        <p>此邮件由询价系统自动发送，请勿回复。</p>
+        <p>如有疑问，请联系系统管理员。</p>
+      </div>
+    `;
+    
+    return getCompatibleWrapper(content);
+  },
   quoterAssignmentNotification: (quote) => {
     const content = `
       <div class="header">
@@ -596,9 +642,146 @@ const EmailTemplates = {
     </body>
     </html>
   `,
-  passwordReset: (resetUrl) => `<!-- passwordReset template -->`,
-  supplierQuotedNotification: (quote) => `<!-- supplierQuotedNotification template -->`,
-  finalQuoteNotification: (quote) => `<!-- finalQuoteNotification template -->`
+  passwordReset: (resetUrl) => {
+    const content = `
+      <div class="header">
+        <h1>🔒 密码重置</h1>
+      </div>
+      
+      <div class="content">
+        <p>您好！</p>
+        <p>您请求重置密码，请点击下面的按钮进行密码重置：</p>
+        
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${resetUrl}" class="action-button" style="background-color: #dc3545 !important; border-color: #dc3545 !important;">
+            重置密码
+          </a>
+        </p>
+        
+        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 0 5px 5px 0;">
+          <strong>⚠️ 重要提醒：</strong>
+          <ul style="margin: 10px 0; padding-left: 20px;">
+            <li>此链接将在 <strong>1小时</strong> 后过期</li>
+            <li>如果您没有请求重置密码，请忽略此邮件</li>
+            <li>为了账户安全，请不要将此链接分享给他人</li>
+          </ul>
+        </div>
+        
+        <p>如果按钮无法点击，请复制以下地址到浏览器地址栏：</p>
+        <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; word-break: break-all; font-family: monospace; font-size: 12px; color: #6c757d;">
+          ${resetUrl}
+        </div>
+      </div>
+      
+      <div class="footer">
+        <p>此邮件由询价系统自动发送，请勿回复。</p>
+        <p>如有疑问，请联系系统管理员。</p>
+      </div>
+    `;
+    
+    return getCompatibleWrapper(content);
+  },
+  supplierQuotedNotification: (quote) => {
+    const content = `
+      <div class="header">
+        <h1>供应商已报价</h1>
+      </div>
+      
+      <div class="content">
+        <p>您好，</p>
+        <p>供应商 <strong>${quote.supplier ? escape(quote.supplier.name) : ''}</strong> 已经确认报价，请查看并上传最终报价文件。</p>
+        
+        <div class="info-box">
+          <h3>询价单信息</h3>
+          <div class="info-row">
+            <span class="info-label">询价号:</span>
+            <span class="info-value quote-number">${escape(quote.quoteNumber)}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">标题:</span>
+            <span class="info-value">${escape(quote.title)}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">供应商:</span>
+            <span class="info-value">${quote.supplier ? escape(quote.supplier.name) : ''} (${quote.supplier ? escape(quote.supplier.email) : ''})</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">报价文件:</span>
+            <span class="info-value">${quote.supplierFiles && quote.supplierFiles.length > 0 
+              ? quote.supplierFiles.map(file => escape(file.originalName)).join(', ')
+              : '无'}</span>
+          </div>
+        </div>
+        
+        <p>请及时处理此询价单，上传最终报价文件给客户。</p>
+        
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:4200'}/quotes/${quote._id}" class="action-button">
+            查看询价详情
+          </a>
+        </p>
+      </div>
+      
+      <div class="footer">
+        <p>此邮件由询价系统自动发送，请勿回复。</p>
+      </div>
+    `;
+    
+    return getCompatibleWrapper(content);
+  },
+  finalQuoteNotification: (quote) => {
+    const content = `
+      <div class="header">
+        <h1>最终报价已确认</h1>
+      </div>
+      
+      <div class="content">
+        <p>尊敬的客户，</p>
+        <p>您的询价单 <strong>${escape(quote.quoteNumber)}</strong> 的最终报价已经确认完成。</p>
+        
+        <div class="info-box">
+          <h3>询价单信息</h3>
+          <div class="info-row">
+            <span class="info-label">询价号:</span>
+            <span class="info-value quote-number">${escape(quote.quoteNumber)}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">标题:</span>
+            <span class="info-value">${escape(quote.title)}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">描述:</span>
+            <span class="info-value">${escape(quote.description || '')}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">报价员:</span>
+            <span class="info-value">${quote.quoter && quote.quoter.name ? escape(quote.quoter.name) : '未分配'}${quote.quoter && quote.quoter.email ? ` (${escape(quote.quoter.email)})` : ''}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">最终报价文件:</span>
+            <span class="info-value">${quote.quoterFiles && quote.quoterFiles.length > 0 
+              ? quote.quoterFiles.map(file => escape(file.originalName)).join(', ')
+              : '无'}</span>
+          </div>
+        </div>
+        
+        <p>您可以登录系统下载最终报价文件。</p>
+        
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:4200'}/quotes/${quote._id}" class="action-button">
+            查看询价详情
+          </a>
+        </p>
+      </div>
+      
+      <div class="footer">
+        <p>此邮件由询价系统自动发送，请勿回复。</p>
+        <p>如有疑问，请联系系统管理员。</p>
+      </div>
+    `;
+    
+    return getCompatibleWrapper(content);
+  }
 };
 
 module.exports = {
