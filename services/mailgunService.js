@@ -2,6 +2,7 @@ const formData = require('form-data');
 const Mailgun = require('mailgun.js');
 const fs = require('fs');
 const logger = require('../utils/logger');
+const { escapeHtml: escape, getCompatibleWrapper } = require('../utils/emailCompatibility');
 
 // 初始化Mailgun客户端
 const mailgun = new Mailgun(formData);
@@ -386,8 +387,215 @@ const EmailTemplates = {
 
   // 其他模板保持不变，这里省略...
   quoteResponse: (quote) => `<!-- quoteResponse template -->`,
-  quoterAssignmentNotification: (quote) => `<!-- quoterAssignmentNotification template -->`,
-  supplierQuoteNotification: (quote) => `<!-- supplierQuoteNotification template -->`,
+  quoterAssignmentNotification: (quote) => {
+    const content = `
+      <div class="header">
+        <h1>📋 新的询价单需要处理</h1>
+      </div>
+      
+      <div class="content">
+        <p>有新的询价单需要您分配供应商进行报价，请及时处理。</p>
+        
+        <div class="info-box">
+          <div class="info-row">
+            <span class="info-label">询价号:</span>
+            <span class="info-value quote-number">${escape(quote.quoteNumber)}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">标题:</span>
+            <span class="info-value">${escape(quote.title)}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">描述:</span>
+            <span class="info-value">${escape(quote.description) || '无'}</span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">询价文件:</span>
+            <span class="info-value">${(quote.customerFiles && quote.customerFiles.length > 0) 
+              ? quote.customerFiles.map(file => escape(file.originalName)).join(', ')
+              : '无'}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">创建时间:</span>
+            <span class="info-value">${quote.createdAt.toLocaleString('zh-CN')}</span>
+          </div>
+        </div>
+        
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL || '#'}/quote-view/${quote._id}" class="action-button">
+            分配供应商
+          </a>
+        </p>
+      </div>
+      
+      <div class="footer">
+        <p>此邮件由询价系统自动发送，请勿回复。</p>
+        <p>如有疑问，请联系系统管理员。</p>
+      </div>
+    `;
+    
+    return getCompatibleWrapper(content);
+  },
+  supplierQuoteNotification: (quote) => `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>供应商报价通知</title>
+      <style>
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          line-height: 1.6;
+          color: #333;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: #f4f4f4;
+        }
+        .container {
+          background-color: #ffffff;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          overflow: hidden;
+        }
+        .header {
+          background-color: #28a745;
+          color: white;
+          padding: 30px 20px;
+          text-align: center;
+        }
+        .header h1 {
+          margin: 0;
+          font-size: 24px;
+          font-weight: 300;
+        }
+        .content {
+          padding: 30px 20px;
+        }
+        .info-box {
+          background-color: #f8f9fa;
+          border-left: 4px solid #28a745;
+          padding: 15px;
+          margin: 20px 0;
+          border-radius: 0 4px 4px 0;
+        }
+        .info-item {
+          margin: 10px 0;
+          display: flex;
+          align-items: center;
+        }
+        .info-label {
+          font-weight: bold;
+          color: #495057;
+          min-width: 100px;
+        }
+        .info-value {
+          color: #212529;
+        }
+        .btn {
+          display: inline-block;
+          padding: 12px 24px;
+          background-color: #28a745;
+          color: white !important;
+          text-decoration: none;
+          border-radius: 6px;
+          font-weight: 500;
+          font-size: 16px;
+          text-align: center;
+          margin: 15px 5px;
+          border: 2px solid #28a745;
+        }
+        .btn:hover {
+          background-color: #218838;
+          border-color: #218838;
+        }
+        .footer {
+          background-color: #f8f9fa;
+          padding: 20px;
+          text-align: center;
+          color: #6c757d;
+          font-size: 14px;
+        }
+        .supplier-info {
+          background-color: #e3f2fd;
+          border-left: 4px solid #2196f3;
+          padding: 15px;
+          margin: 20px 0;
+          border-radius: 0 4px 4px 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>📋 供应商报价通知</h1>
+        </div>
+        
+        <div class="content">
+          <p>您好！</p>
+          <p>供应商已完成询价单的报价，请及时处理并上传最终报价文件。</p>
+          
+          <div class="info-box">
+            <h3>📄 询价单信息</h3>
+            <div class="info-item">
+              <span class="info-label">询价单号:</span>
+              <span class="info-value">${escapeHtml(quote.quoteNumber)}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">询价标题:</span>
+              <span class="info-value">${escapeHtml(quote.title)}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">询价描述:</span>
+              <span class="info-value">${escapeHtml(quote.description || '无')}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">当前状态:</span>
+              <span class="info-value">供应商已报价</span>
+            </div>
+          </div>
+          
+          ${quote.supplier ? `
+          <div class="supplier-info">
+            <h3>🏢 供应商信息</h3>
+            <div class="info-item">
+              <span class="info-label">供应商:</span>
+              <span class="info-value">${escapeHtml(quote.supplier.name || '未知')}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">公司:</span>
+              <span class="info-value">${escapeHtml(quote.supplier.company || '未知')}</span>
+            </div>
+            ${(quote.supplierFiles && quote.supplierFiles.length > 0) ? `
+            <div class="info-item">
+              <span class="info-label">报价文件:</span>
+              <span class="info-value">${quote.supplierFiles.map(file => escapeHtml(file.originalName)).join(', ')}</span>
+            </div>
+            ` : ''}
+          </div>
+          ` : ''}
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:4200'}/quote-view/${quote._id}" class="btn">
+              📝 查看详情
+            </a>
+          </div>
+          
+          <p style="color: #6c757d; font-size: 14px;">
+            请登录系统查看供应商报价并上传最终报价文件。客户将在您完成最终报价后收到通知。
+          </p>
+        </div>
+        
+        <div class="footer">
+          <p>此邮件由询价系统自动发送，请勿回复。</p>
+          <p>如有疑问，请联系系统管理员。</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `,
   passwordReset: (resetUrl) => `<!-- passwordReset template -->`,
   supplierQuotedNotification: (quote) => `<!-- supplierQuotedNotification template -->`,
   finalQuoteNotification: (quote) => `<!-- finalQuoteNotification template -->`
