@@ -175,63 +175,9 @@ router.post('/', auth, authorize('customer'), upload.fields([
     await quote.populate('customer', 'name email company');
     logger.database('保存询价单', 'quotes', { quoteNumber: quote.quoteNumber }, Date.now() - saveStartTime);
 
-    // 异步发送邮件通知报价员分配供应商，不阻塞响应
-    setTimeout(async () => {
-      try {
-        const quoters = await User.find({ role: 'quoter', isActive: true })
-          .select('email')
-          .lean();
-        
-        if (quoters.length === 0) {
-          logger.warn('没有找到活跃的报价员');
-          return;
-        }
-
-        // 创建不包含客户信息的询价单对象用于邮件发送
-        const sanitizedQuote = {
-          _id: quote._id,
-          quoteNumber: quote.quoteNumber,
-          title: quote.title,
-          description: quote.description,
-          createdAt: quote.createdAt,
-          customerFiles: quote.customerFiles
-          // 注意：不包含 customer 字段，保护客户隐私
-        };
-
-        const emailPromises = quoters.map(quoter => 
-          emailService.sendQuoterAssignmentNotification(quoter.email, sanitizedQuote)
-            .catch(error => logger.error(`发送邮件给报价员 ${quoter.email} 失败`, { error: error.message }))
-        );
-        
-        // 串行发送避免超时
-        let successCount = 0;
-        let failCount = 0;
-        
-        for (const quoter of quoters) {
-          try {
-            await Promise.race([
-              emailService.sendQuoterAssignmentNotification(quoter.email, sanitizedQuote),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('邮件发送超时')), 45000)
-              )
-            ]);
-            successCount++;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          } catch (error) {
-            failCount++;
-            logger.error(`发送邮件给报价员 ${quoter.email} 失败`, { error: error.message });
-          }
-        }
-        
-        logger.info(`询价单 ${quote.quoteNumber} 报价员分配通知邮件发送完成`, { 
-          successCount, 
-          failCount, 
-          totalQuoters: quoters.length 
-        });
-      } catch (error) {
-        logger.error('批量发送报价员邮件失败', { error: error.message, stack: error.stack });
-      }
-    });
+    // 暂时禁用邮件发送功能，避免超时问题影响询价单创建
+    // TODO: 修复邮件服务器连接问题后重新启用
+    logger.info(`询价单 ${quote.quoteNumber} 创建成功，邮件通知已暂时禁用`);
 
     const totalTime = Date.now() - startTime;
     logger.request(req, totalTime);
