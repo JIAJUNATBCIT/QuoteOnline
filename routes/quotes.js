@@ -203,7 +203,7 @@ router.post('/', auth, authorize('customer'), upload.fields([
             .catch(error => logger.error(`发送邮件给报价员 ${quoter.email} 失败`, { error: error.message }))
         );
         
-        const results = await /* 串行发送避免超时 */
+        // 串行发送避免超时
         let successCount = 0;
         let failCount = 0;
         
@@ -221,9 +221,7 @@ router.post('/', auth, authorize('customer'), upload.fields([
             failCount++;
             logger.error(`发送邮件给报价员 ${quoter.email} 失败`, { error: error.message });
           }
-        };
-        const successCount = results.filter(r => r.status === 'fulfilled').length;
-        const failCount = results.length - successCount;
+        }
         
         logger.info(`询价单 ${quote.quoteNumber} 报价员分配通知邮件发送完成`, { 
           successCount, 
