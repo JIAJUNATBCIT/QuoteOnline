@@ -13,7 +13,6 @@ import { Router } from '@angular/router';
 export class AuthService {
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   public currentUser = this.currentUserSubject.asObservable();
-  private isLoggingOut = false;
 
   constructor(
     private http: HttpClient,
@@ -65,22 +64,10 @@ export class AuthService {
   }
 
   logout() {
-    // 防止重复调用登出逻辑
-    if (this.isLoggingOut) {
-      return;
-    }
-    
-    this.isLoggingOut = true;
     this.tokenService.clearTokens();
     localStorage.removeItem('user');
     this.currentUserSubject.next(null);
-    
-    // 延迟重置标志，避免并发问题
-    setTimeout(() => {
-      this.router.navigate(['/login']).then(() => {
-        this.isLoggingOut = false;
-      });
-    }, 50);
+    this.router.navigate(['/login']);
   }
 
   getCurrentUser(): User | null {

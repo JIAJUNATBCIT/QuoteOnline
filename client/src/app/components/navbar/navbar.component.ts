@@ -48,7 +48,6 @@ export class NavbarComponent {
 
   logout() {
     this.authService.logout();
-    this.router.navigate(['/login']);
   }
 
   getRoleDisplayName(role: string): string {
