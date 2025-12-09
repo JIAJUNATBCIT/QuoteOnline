@@ -810,6 +810,8 @@ export class QuoteDetailComponent implements OnInit {
     if (!this.quote) return false;
     const user = this.authService.getCurrentUser();
     if (!user) return false;
+    // 如果已经报价，则不能在拒绝报价，如果拒绝报价了，就不能再拒绝
+    if (['quoted', 'rejected'].includes(this.quote.status)) return false;
     
     return this.permissionService.canRejectQuote(user);
   }
