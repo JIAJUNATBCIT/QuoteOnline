@@ -1,6 +1,7 @@
 const formData = require('form-data');
 const Mailgun = require('mailgun.js');
 const fs = require('fs');
+const path = require('path');
 const logger = require('../utils/logger');
 const { escapeHtml: escape, getCompatibleWrapper } = require('../utils/emailCompatibility');
 
@@ -14,15 +15,40 @@ const createAttachments = (files) => {
   return files.map(file => {
     if (file.path) {
       try {
-        return new mailgun.Attachment({
-          data: fs.readFileSync(file.path),
-          filename: file.originalName,
-          contentType: file.mimetype || 'application/octet-stream'
-        });
-      } catch (error) {
-        logger.error('读取文件失败', { 
-          error: error.message,
+        // 构建绝对路径
+        let filePath = file.path;
+        if (!path.isAbsolute(filePath)) {
+          filePath = path.resolve(process.cwd(), filePath);
+        }
+        
+        logger.info('检查附件文件', {
+          originalPath: file.path,
+          absolutePath: filePath,
           filename: file.originalName
+        });
+        
+        // 检查文件是否存在
+        if (fs.existsSync(filePath)) {
+          return {
+            data: fs.createReadStream(filePath),
+            filename: file.originalName,
+            contentType: file.mimetype || 'application/octet-stream'
+          };
+        } else {
+          logger.error('附件文件不存在', { 
+            filename: file.originalName,
+            originalPath: file.path,
+            absolutePath: filePath,
+            cwd: process.cwd()
+          });
+          return null;
+        }
+      } catch (error) {
+        logger.error('读取附件文件失败', { 
+          error: error.message,
+          filename: file.originalName,
+          path: file.path,
+          stack: error.stack
         });
         return null;
       }
@@ -117,9 +143,14 @@ const sendSupplierQuotedNotification = async (quoterEmail, quote) => {
       from: process.env.EMAIL_FROM,
       to: quoterEmail,
       subject: `供应商已报价 - ${quote.quoteNumber} - ${quote.title}`,
-      html: EmailTemplates.supplierQuotedNotification(quote),
-      attachment: createAttachments(quote.supplierFiles || [])
+      html: EmailTemplates.supplierQuotedNotification(quote)
     };
+
+    // 添加附件
+    const attachments = createAttachments(quote.supplierFiles || []);
+    if (attachments.length > 0) {
+      messageData.attachment = attachments;
+    }
 
     const result = await client.messages.create(DOMAIN, messageData);
     const endTime = Date.now();
@@ -144,9 +175,14 @@ const sendFinalQuoteNotification = async (customerEmail, quote) => {
       from: process.env.EMAIL_FROM || 'sales@junbclistings.com',
       to: customerEmail,
       subject: `最终报价已确认 - ${quote.quoteNumber} - ${quote.title}`,
-      html: EmailTemplates.finalQuoteNotification(quote),
-      attachment: createAttachments(quote.quoterFiles)
+      html: EmailTemplates.finalQuoteNotification(quote)
     };
+
+    // 添加附件
+    const attachments = createAttachments(quote.quoterFiles);
+    if (attachments.length > 0) {
+      messageData.attachment = attachments;
+    }
 
     const result = await client.messages.create(DOMAIN, messageData);
     const endTime = Date.now();
@@ -171,9 +207,14 @@ const sendSupplierGroupNotification = async (supplierEmail, quote) => {
       from: process.env.EMAIL_FROM,
       to: supplierEmail,
       subject: `新的询价请求 - ${quote.quoteNumber} - ${quote.title}`,
-      html: EmailTemplates.supplierGroupNotification(quote),
-      attachment: createAttachments(quote.customerFiles || [])
+      html: EmailTemplates.supplierGroupNotification(quote)
     };
+
+    // 添加附件
+    const attachments = createAttachments(quote.customerFiles || []);
+    if (attachments.length > 0) {
+      messageData.attachment = attachments;
+    }
 
     const result = await client.messages.create(DOMAIN, messageData);
     const endTime = Date.now();
