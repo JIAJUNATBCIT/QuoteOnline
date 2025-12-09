@@ -926,9 +926,9 @@ export class QuoteDetailComponent implements OnInit {
       case 'supplier':
         return ['in_progress', 'rejected', 'supplier_quoted'].includes(this.quote.status);
       case 'quoter':
-        return ['pending', 'supplier_quoted', 'in_progress','quoted'].includes(this.quote.status);
+        return ['pending', 'supplier_quoted', 'in_progress','quoted', 'rejected'].includes(this.quote.status);
       case 'admin':
-        return ['pending', 'supplier_quoted', 'in_progress'].includes(this.quote.status);
+        return ['pending', 'supplier_quoted', 'in_progress','quoted', 'rejected'].includes(this.quote.status);
       default:
         return false;
     }
