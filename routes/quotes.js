@@ -655,9 +655,39 @@ router.put('/:id', auth, upload.fields([
      .populate('quoter', 'name email company')
      .populate('supplier', 'name email company');
     
-
-    
     logger.database('更新询价单', 'quotes', { quoteId: req.params.id }, Date.now() - dbStartTime);
+
+    // 处理报价员删除文件后的状态回退逻辑
+    if (req.body.deleteQuoterFiles === 'true' && updatedQuote.status === 'quoted') {
+      let newStatus = 'pending'; // 默认状态：待处理
+      
+      // 检查供应商是否已上传过报价文件
+      if (updatedQuote.supplierFiles && updatedQuote.supplierFiles.length > 0) {
+        newStatus = 'supplier_quoted'; // 若供应商上传过，退回到"核价中"
+      } else {
+        // 供应商没有上传过文件，检查是否已分配供应商群组
+        if (updatedQuote.assignedGroups && updatedQuote.assignedGroups.length > 0) {
+          newStatus = 'in_progress'; // 若已分配供应商群组，退回到"处理中"
+        } else {
+          newStatus = 'pending'; // 若没分配过供应商群组，退回到"待处理"
+        }
+      }
+      
+      // 更新状态
+      if (newStatus !== updatedQuote.status) {
+        await Quote.findByIdAndUpdate(req.params.id, { status: newStatus });
+        updatedQuote.status = newStatus;
+        
+        logger.info(`报价员删除最终报价文件，状态自动回退`, {
+          quoteId: req.params.id,
+          oldStatus: 'quoted',
+          newStatus: newStatus,
+          hasSupplierFiles: !!(updatedQuote.supplierFiles && updatedQuote.supplierFiles.length > 0),
+          hasAssignedGroups: !!(updatedQuote.assignedGroups && updatedQuote.assignedGroups.length > 0),
+          assignedGroupsCount: updatedQuote.assignedGroups ? updatedQuote.assignedGroups.length : 0
+        });
+      }
+    }
 
     // 供应商上传文件时不发送邮件，等待确认报价后才发送
     // 邮件通知移至 confirmSupplierQuote 路由中处理
