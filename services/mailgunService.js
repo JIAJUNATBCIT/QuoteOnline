@@ -252,7 +252,7 @@ const sendQuoteRejectionNotification = async (customerEmail, quote) => {
     };
 
         // 添加附件
-    const attachments = createAttachments(quote.clientFiles || []);
+    const attachments = createAttachments(quote.customerFiles || []);
     if (attachments.length > 0) {
       messageData.attachment = attachments;
     }
