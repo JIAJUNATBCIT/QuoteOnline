@@ -61,7 +61,10 @@ export class AuthInterceptor implements HttpInterceptor {
         catchError((error) => {
           this.isRefreshing = false;
           this.tokenService.clearTokens();
-          this.authService.logout();
+          // 只有在用户还未主动登出时才跳转登录页
+          if (this.authService.isLoggedIn()) {
+            this.authService.logout();
+          }
           return this.errorHandler.handleError(error);
         })
       );
