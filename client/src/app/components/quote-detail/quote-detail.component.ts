@@ -289,11 +289,12 @@ export class QuoteDetailComponent implements OnInit {
       return;
     }
     
-    if ((user?.role === 'quoter' || user?.role === 'admin') && !['pending', 'supplier_quoted', 'in_progress','quoted'].includes(this.quote?.status || '')) {
-      alert('询价单当前状态不允许上传最终报价文件');
-      event.target.value = '';
-      return;
-    }
+    // 询价员和管理员在询价的任何阶段都可以上传最终报价文件
+    // if ((user?.role === 'quoter' || user?.role === 'admin') && !['pending', 'supplier_quoted', 'in_progress','quoted'].includes(this.quote?.status || '')) {
+    //   alert('询价单当前状态不允许上传最终报价文件');
+    //   event.target.value = '';
+    //   return;
+    // }
     
     // 检查所有文件类型和大小
     const validFiles: File[] = [];
