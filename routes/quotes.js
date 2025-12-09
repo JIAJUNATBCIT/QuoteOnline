@@ -681,7 +681,8 @@ router.put('/:id', auth, upload.fields([
       { new: true }
     ).populate('customer', 'name email company')
      .populate('quoter', 'name email company')
-     .populate('supplier', 'name email company');
+     .populate('supplier', 'name email company')
+     .populate('assignedGroups', 'name description color');
     
     logger.database('更新询价单', 'quotes', { quoteId: req.params.id }, Date.now() - dbStartTime);
 
@@ -788,7 +789,8 @@ router.patch('/:id/reject', auth, async (req, res) => {
       { new: true }
     ).populate('customer', 'name email company')
      .populate('quoter', 'name email company')
-     .populate('supplier', 'name email company');
+     .populate('supplier', 'name email company')
+     .populate('assignedGroups', 'name description color');
 
     // 异步发送邮件通知客户不予报价的理由
     setImmediate(async () => {
@@ -861,7 +863,8 @@ router.patch('/:id/assign-supplier', auth, async (req, res) => {
       },
       { new: true }
     ).populate('customer', 'name email company')
-     .populate('supplier', 'name email company');
+     .populate('supplier', 'name email company')
+     .populate('assignedGroups', 'name description color');
 
     // 异步发送邮件通知被选中的供应商
     setImmediate(async () => {
@@ -1399,7 +1402,8 @@ router.patch('/:id/confirm-supplier-quote', auth, async (req, res) => {
       { new: true }
     ).populate('customer', 'name email company')
      .populate('quoter', 'name email company')
-     .populate('supplier', 'name email company');
+     .populate('supplier', 'name email company')
+     .populate('assignedGroups', 'name description color');
 
     // 异步发送邮件通知报价员
     setImmediate(async () => {
@@ -1527,7 +1531,8 @@ router.patch('/:id/confirm-final-quote', auth, async (req, res) => {
       { new: true }
     ).populate('customer', 'name email company')
      .populate('quoter', 'name email company')
-     .populate('supplier', 'name email company');
+     .populate('supplier', 'name email company')
+     .populate('assignedGroups', 'name description color');
 
     // 异步发送邮件通知客户
     setImmediate(async () => {
