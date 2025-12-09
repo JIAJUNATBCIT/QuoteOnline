@@ -118,8 +118,13 @@ const sendQuoterAssignmentNotification = async (quoterEmail, quote) => {
       html: EmailTemplates.quoterAssignmentNotification(quote)
     };
 
+        // 添加附件
+    const attachments = createAttachments(quote.clientFiles || []);
+    if (attachments.length > 0) {
+      messageData.attachment = attachments;
+    }
+
     const result = await client.messages.create(DOMAIN, messageData);
-    const endTime = Date.now();
     
     logger.email('发送', quoterEmail, quote.quoteNumber, true, null);
     
@@ -153,7 +158,6 @@ const sendSupplierQuotedNotification = async (quoterEmail, quote) => {
     }
 
     const result = await client.messages.create(DOMAIN, messageData);
-    const endTime = Date.now();
     
     logger.email('发送', quoterEmail, quote.quoteNumber, true, null);
     
@@ -246,6 +250,12 @@ const sendQuoteRejectionNotification = async (customerEmail, quote) => {
       subject: `询价不予处理 - ${quote.quoteNumber} - ${quote.title}`,
       html: EmailTemplates.quoteRejectionNotification(quote)
     };
+
+        // 添加附件
+    const attachments = createAttachments(quote.clientFiles || []);
+    if (attachments.length > 0) {
+      messageData.attachment = attachments;
+    }
 
     const result = await client.messages.create(DOMAIN, messageData);
     const endTime = Date.now();
@@ -964,7 +974,7 @@ const EmailTemplates = {
       </div>
       
       <div class="content">
-        <p>尊敬的供应商，</p>
+        <p>您好，</p>
         <p>您有一个新的询价请求需要处理，请查看详细信息并进行报价。</p>
         
         <div class="info-box">
