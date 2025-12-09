@@ -118,8 +118,8 @@ const sendQuoterAssignmentNotification = async (quoterEmail, quote) => {
       html: EmailTemplates.quoterAssignmentNotification(quote)
     };
 
-        // 添加附件
-    const attachments = createAttachments(quote.clientFiles || []);
+    // 添加附件
+    const attachments = createAttachments(quote.customerFiles || []);
     if (attachments.length > 0) {
       messageData.attachment = attachments;
     }
