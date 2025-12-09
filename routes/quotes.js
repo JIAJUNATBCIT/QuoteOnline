@@ -792,37 +792,7 @@ router.patch('/:id/reject', auth, async (req, res) => {
      .populate('supplier', 'name email company')
      .populate('assignedGroups', 'name description color');
 
-    // 异步发送邮件通知客户不予报价的理由
-    setImmediate(async () => {
-      try {
-        if (updatedQuote.customer && updatedQuote.customer.email) {
-          // 重新获取完整的询价单数据，确保包含 customerFiles
-          const fullQuote = await Quote.findById(updatedQuote._id)
-            .populate('customer', 'name email company')
-            .populate('quoter', 'name email company')
-            .populate('supplier', 'name email company');
-          
-          await emailService.sendQuoteRejectionNotification(
-            updatedQuote.customer.email, 
-            fullQuote
-          );
-          
-          logger.info(`不予报价通知邮件发送完成`, { 
-            quoteId: updatedQuote._id,
-            customerEmail: updatedQuote.customer.email,
-            rejectReason: rejectReason.trim(),
-            hasCustomerFiles: !!(fullQuote.customerFiles && fullQuote.customerFiles.length > 0),
-            customerFilesCount: fullQuote.customerFiles ? fullQuote.customerFiles.length : 0
-          });
-        }
-      } catch (error) {
-        logger.error('不予报价通知邮件发送失败', {
-          error: error.message,
-          quoteId: updatedQuote._id,
-          customerEmail: updatedQuote.customer?.email
-        });
-      }
-    });
+
 
     // 使用通用过滤函数处理响应数据
     const filteredQuote = PermissionUtils.filterQuoteData(updatedQuote, req.user.role);
@@ -1460,37 +1430,7 @@ router.patch('/:id/confirm-supplier-quote', auth, async (req, res) => {
       }
     });
 
-    // 异步发送邮件通知客户不予报价的理由
-    setImmediate(async () => {
-      try {
-        if (updatedQuote.customer && updatedQuote.customer.email) {
-          // 重新获取完整的询价单数据，确保包含 customerFiles
-          const fullQuote = await Quote.findById(updatedQuote._id)
-            .populate('customer', 'name email company')
-            .populate('quoter', 'name email company')
-            .populate('supplier', 'name email company');
-          
-          await emailService.sendQuoteRejectionNotification(
-            updatedQuote.customer.email, 
-            fullQuote
-          );
-          
-          logger.info(`不予报价通知邮件发送完成`, { 
-            quoteId: updatedQuote._id,
-            customerEmail: updatedQuote.customer.email,
-            rejectReason: rejectReason.trim(),
-            hasCustomerFiles: !!(fullQuote.customerFiles && fullQuote.customerFiles.length > 0),
-            customerFilesCount: fullQuote.customerFiles ? fullQuote.customerFiles.length : 0
-          });
-        }
-      } catch (error) {
-        logger.error('不予报价通知邮件发送失败', {
-          error: error.message,
-          quoteId: updatedQuote._id,
-          customerEmail: updatedQuote.customer?.email
-        });
-      }
-    });
+
 
     // 使用通用过滤函数处理响应数据
     const filteredQuote = PermissionUtils.filterQuoteData(updatedQuote, req.user.role);
@@ -1560,37 +1500,7 @@ router.patch('/:id/confirm-final-quote', auth, async (req, res) => {
       }
     });
 
-    // 异步发送邮件通知客户不予报价的理由
-    setImmediate(async () => {
-      try {
-        if (updatedQuote.customer && updatedQuote.customer.email) {
-          // 重新获取完整的询价单数据，确保包含 customerFiles
-          const fullQuote = await Quote.findById(updatedQuote._id)
-            .populate('customer', 'name email company')
-            .populate('quoter', 'name email company')
-            .populate('supplier', 'name email company');
-          
-          await emailService.sendQuoteRejectionNotification(
-            updatedQuote.customer.email, 
-            fullQuote
-          );
-          
-          logger.info(`不予报价通知邮件发送完成`, { 
-            quoteId: updatedQuote._id,
-            customerEmail: updatedQuote.customer.email,
-            rejectReason: rejectReason.trim(),
-            hasCustomerFiles: !!(fullQuote.customerFiles && fullQuote.customerFiles.length > 0),
-            customerFilesCount: fullQuote.customerFiles ? fullQuote.customerFiles.length : 0
-          });
-        }
-      } catch (error) {
-        logger.error('不予报价通知邮件发送失败', {
-          error: error.message,
-          quoteId: updatedQuote._id,
-          customerEmail: updatedQuote.customer?.email
-        });
-      }
-    });
+
 
     // 使用通用过滤函数处理响应数据
     const filteredQuote = PermissionUtils.filterQuoteData(updatedQuote, req.user.role);
