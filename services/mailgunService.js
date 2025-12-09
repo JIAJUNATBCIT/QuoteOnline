@@ -389,6 +389,103 @@ const EmailTemplates = {
   // 其他模板保持不变，这里省略...
   quoteResponse: (quote) => {
     const content = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>报价回复 - ${quote.quoteNumber}</title>
+        <style>
+          body {
+            font-family: 'Microsoft YaHei', 'SimHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+          }
+          .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+          }
+          .header {
+            background-color: #28a745;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 300;
+          }
+          .content {
+            padding: 30px 20px;
+          }
+          .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+          }
+          .info-row {
+            margin: 10px 0;
+            display: flex;
+            align-items: flex-start;
+          }
+          .info-label {
+            font-weight: 600;
+            color: #495057;
+            min-width: 100px;
+            margin-right: 10px;
+          }
+          .info-value {
+            flex: 1;
+            word-break: break-word;
+          }
+          .quote-number {
+            color: #007bff;
+            font-weight: bold;
+            font-size: 18px;
+          }
+          .price {
+            color: #28a745;
+            font-weight: bold;
+            font-size: 20px;
+          }
+          .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+          }
+          .action-button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white !important;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 500;
+            font-size: 16px;
+            text-align: center;
+            border: 2px solid #007bff;
+          }
+          .action-button:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+          }
+        </style>
+      </head>
+      <body>
+      <div class="container">
       <div class="header">
         <h1>✅ 报价回复</h1>
       </div>
@@ -429,12 +526,115 @@ const EmailTemplates = {
         <p>此邮件由询价系统自动发送，请勿回复。</p>
         <p>如有疑问，请联系系统管理员。</p>
       </div>
+      </div>
+      </div>
+      </div>
+      </div>
+      </div>
+      </body>
+      </html>
     `;
     
-    return getCompatibleWrapper(content);
+    return content;
   },
   quoterAssignmentNotification: (quote) => {
     const content = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>新的询价单需要分配供应商 - ${quote.quoteNumber}</title>
+        <style>
+          body {
+            font-family: 'Microsoft YaHei', 'SimHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+          }
+          .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+          }
+          .header {
+            background-color: #667eea;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 300;
+          }
+          .content {
+            padding: 30px 20px;
+          }
+          .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+          }
+          .info-box h3 {
+            margin-top: 0;
+            color: #667eea;
+          }
+          .info-row {
+            margin: 10px 0;
+            display: flex;
+            align-items: flex-start;
+          }
+          .info-label {
+            font-weight: 600;
+            color: #495057;
+            min-width: 100px;
+            margin-right: 10px;
+          }
+          .info-value {
+            flex: 1;
+            word-break: break-word;
+          }
+          .quote-number {
+            color: #667eea;
+            font-weight: bold;
+            font-size: 18px;
+          }
+          .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+          }
+          .action-button {
+            display: inline-block;
+            background-color: #667eea;
+            color: white !important;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 500;
+            font-size: 16px;
+            text-align: center;
+            border: 2px solid #667eea;
+          }
+          .action-button:hover {
+            background-color: #5a6fd8;
+            border-color: #5a6fd8;
+          }
+        </style>
+      </head>
+      <body>
+      <div class="container">
       <div class="header">
         <h1>📋 新的询价单需要处理</h1>
       </div>
@@ -479,9 +679,16 @@ const EmailTemplates = {
         <p>此邮件由询价系统自动发送，请勿回复。</p>
         <p>如有疑问，请联系系统管理员。</p>
       </div>
+      </div>
+      </div>
+      </div>
+      </div>
+      </div>
+      </body>
+      </html>
     `;
     
-    return getCompatibleWrapper(content);
+    return content;
   },
   supplierQuoteNotification: (quote) => `
     <!DOCTYPE html>
@@ -644,6 +851,98 @@ const EmailTemplates = {
   `,
   passwordReset: (resetUrl) => {
     const content = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>密码重置</title>
+        <style>
+          body {
+            font-family: 'Microsoft YaHei', 'SimHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+          }
+          .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+          }
+          .header {
+            background-color: #dc3545;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 300;
+          }
+          .content {
+            padding: 30px 20px;
+          }
+          .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #dc3545;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+          }
+          .info-row {
+            margin: 10px 0;
+            display: flex;
+            align-items: flex-start;
+          }
+          .info-label {
+            font-weight: 600;
+            color: #495057;
+            min-width: 100px;
+            margin-right: 10px;
+          }
+          .info-value {
+            flex: 1;
+            word-break: break-word;
+          }
+          .quote-number {
+            color: #dc3545;
+            font-weight: bold;
+            font-size: 18px;
+          }
+          .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+          }
+          .action-button {
+            display: inline-block;
+            background-color: #dc3545;
+            color: white !important;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 500;
+            font-size: 16px;
+            text-align: center;
+            border: 2px solid #dc3545;
+          }
+          .action-button:hover {
+            background-color: #c82333;
+            border-color: #c82333;
+          }
+        </style>
+      </head>
+      <body>
+      <div class="container">
       <div class="header">
         <h1>🔒 密码重置</h1>
       </div>
@@ -677,12 +976,115 @@ const EmailTemplates = {
         <p>此邮件由询价系统自动发送，请勿回复。</p>
         <p>如有疑问，请联系系统管理员。</p>
       </div>
+      </div>
+      </div>
+      </div>
+      </div>
+      </div>
+      </body>
+      </html>
     `;
     
-    return getCompatibleWrapper(content);
+    return content;
   },
   supplierQuotedNotification: (quote) => {
     const content = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>供应商已报价 - ${quote.quoteNumber}</title>
+        <style>
+          body {
+            font-family: 'Microsoft YaHei', 'SimHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+          }
+          .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+          }
+          .header {
+            background-color: #17a2b8;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 300;
+          }
+          .content {
+            padding: 30px 20px;
+          }
+          .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #17a2b8;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+          }
+          .info-box h3 {
+            margin-top: 0;
+            color: #17a2b8;
+          }
+          .info-row {
+            margin: 10px 0;
+            display: flex;
+            align-items: flex-start;
+          }
+          .info-label {
+            font-weight: 600;
+            color: #495057;
+            min-width: 100px;
+            margin-right: 10px;
+          }
+          .info-value {
+            flex: 1;
+            word-break: break-word;
+          }
+          .quote-number {
+            color: #17a2b8;
+            font-weight: bold;
+            font-size: 18px;
+          }
+          .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+          }
+          .action-button {
+            display: inline-block;
+            background-color: #17a2b8;
+            color: white !important;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 500;
+            font-size: 16px;
+            text-align: center;
+            border: 2px solid #17a2b8;
+          }
+          .action-button:hover {
+            background-color: #138496;
+            border-color: #138496;
+          }
+        </style>
+      </head>
+      <body>
+      <div class="container">
       <div class="header">
         <h1>供应商已报价</h1>
       </div>
@@ -725,12 +1127,115 @@ const EmailTemplates = {
       <div class="footer">
         <p>此邮件由询价系统自动发送，请勿回复。</p>
       </div>
+      </div>
+      </div>
+      </div>
+      </div>
+      </div>
+      </body>
+      </html>
     `;
     
-    return getCompatibleWrapper(content);
+    return content;
   },
   finalQuoteNotification: (quote) => {
     const content = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>最终报价已确认 - ${quote.quoteNumber}</title>
+        <style>
+          body {
+            font-family: 'Microsoft YaHei', 'SimHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+          }
+          .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+          }
+          .header {
+            background-color: #6f42c1;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 300;
+          }
+          .content {
+            padding: 30px 20px;
+          }
+          .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6f42c1;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+          }
+          .info-box h3 {
+            margin-top: 0;
+            color: #6f42c1;
+          }
+          .info-row {
+            margin: 10px 0;
+            display: flex;
+            align-items: flex-start;
+          }
+          .info-label {
+            font-weight: 600;
+            color: #495057;
+            min-width: 100px;
+            margin-right: 10px;
+          }
+          .info-value {
+            flex: 1;
+            word-break: break-word;
+          }
+          .quote-number {
+            color: #6f42c1;
+            font-weight: bold;
+            font-size: 18px;
+          }
+          .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+          }
+          .action-button {
+            display: inline-block;
+            background-color: #6f42c1;
+            color: white !important;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 500;
+            font-size: 16px;
+            text-align: center;
+            border: 2px solid #6f42c1;
+          }
+          .action-button:hover {
+            background-color: #5a32a3;
+            border-color: #5a32a3;
+          }
+        </style>
+      </head>
+      <body>
+      <div class="container">
       <div class="header">
         <h1>最终报价已确认</h1>
       </div>
@@ -778,9 +1283,13 @@ const EmailTemplates = {
         <p>此邮件由询价系统自动发送，请勿回复。</p>
         <p>如有疑问，请联系系统管理员。</p>
       </div>
+      </div>
+      </div>
+      </body>
+      </html>
     `;
     
-    return getCompatibleWrapper(content);
+    return content;
   }
 };
 
