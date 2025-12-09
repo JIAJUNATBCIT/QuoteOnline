@@ -792,7 +792,32 @@ router.patch('/:id/reject', auth, async (req, res) => {
      .populate('supplier', 'name email company')
      .populate('assignedGroups', 'name description color');
 
-
+    // 异步发送不予报价通知邮件给客户
+    setImmediate(async () => {
+      try {
+        if (updatedQuote.customer && updatedQuote.customer.email) {
+          // 重新获取完整的询价单数据，确保包含客户文件用于附件
+          const fullQuote = await Quote.findById(updatedQuote._id)
+            .populate('customer', 'name email company')
+            .populate('quoter', 'name email company')
+            .populate('supplier', 'name email company');
+          
+          await emailService.sendQuoteRejectionNotification(updatedQuote.customer.email, fullQuote);
+          logger.info(`不予报价通知邮件发送完成`, { 
+            customerEmail: updatedQuote.customer.email,
+            quoteNumber: updatedQuote.quoteNumber,
+            rejectReason: updatedQuote.rejectReason,
+            hasCustomerFiles: !!(fullQuote.customerFiles && fullQuote.customerFiles.length > 0),
+            customerFilesCount: fullQuote.customerFiles ? fullQuote.customerFiles.length : 0
+          });
+        }
+      } catch (error) {
+        logger.error('发送不予报价通知邮件失败', { 
+          error: error.message,
+          quoteId: updatedQuote._id
+        });
+      }
+    });
 
     // 使用通用过滤函数处理响应数据
     const filteredQuote = PermissionUtils.filterQuoteData(updatedQuote, req.user.role);
