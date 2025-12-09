@@ -214,11 +214,11 @@ const sendSupplierGroupNotification = async (supplierEmail, quote) => {
       html: EmailTemplates.supplierGroupNotification(quote)
     };
 
-    // 添加附件
-    const attachments = createAttachments(quote.customerFiles || []);
-    if (attachments.length > 0) {
-      messageData.attachment = attachments;
-    }
+    // // 添加附件，取消，供应商必须上平台来报价
+    // const attachments = createAttachments(quote.customerFiles || []);
+    // if (attachments.length > 0) {
+    //   messageData.attachment = attachments;
+    // }
 
     const result = await client.messages.create(DOMAIN, messageData);
     const endTime = Date.now();
