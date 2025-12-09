@@ -49,13 +49,12 @@ console.log('-'.repeat(30));
 try {
   const mailgunService = require('./services/mailgunService');
   const functions = [
-    'sendQuoteNotification',
-    'sendQuoteResponse',
     'sendQuoterAssignmentNotification',
-    'sendSupplierQuoteNotification',
     'sendSupplierQuotedNotification',
     'sendFinalQuoteNotification',
-    'sendPasswordReset'
+    'sendPasswordReset',
+    'sendSupplierGroupNotification',
+    'sendQuoteRejectionNotification'
   ];
   
   functions.forEach(func => {

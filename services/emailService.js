@@ -157,149 +157,7 @@ const EmailTemplates = {
     </html>
   `,
 
-  // 生成报价回复邮件模板
-  quoteResponse: (quote) => `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>报价回复</title>
-      <style>
-        body {
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-          background-color: #f4f4f4;
-        }
-        .container {
-          background-color: #ffffff;
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-          overflow: hidden;
-        }
-        .header {
-          background-color: #28a745;
-          color: white;
-          padding: 30px 20px;
-          text-align: center;
-        }
-        .header h1 {
-          margin: 0;
-          font-size: 24px;
-          font-weight: 300;
-        }
-        .content {
-          padding: 30px 20px;
-        }
-        .info-box {
-          background-color: #f8f9fa;
-          border-left: 4px solid #28a745;
-          padding: 20px;
-          margin: 20px 0;
-          border-radius: 0 5px 5px 0;
-        }
-        .info-row {
-          margin: 10px 0;
-          display: flex;
-          align-items: flex-start;
-        }
-        .info-label {
-          font-weight: 600;
-          color: #495057;
-          min-width: 100px;
-          margin-right: 10px;
-        }
-        .info-value {
-          flex: 1;
-          word-break: break-word;
-        }
-        .quote-number {
-          color: #007bff;
-          font-weight: bold;
-          font-size: 18px;
-        }
-        .price {
-          color: #28a745;
-          font-weight: bold;
-          font-size: 20px;
-        }
-        .footer {
-          background-color: #f8f9fa;
-          padding: 20px;
-          text-align: center;
-          border-top: 1px solid #e9ecef;
-          color: #6c757d;
-          font-size: 14px;
-        }
-        .action-button {
-          display: inline-block;
-          background-color: #28a745;
-          color: white !important;
-          padding: 12px 30px;
-          text-decoration: none;
-          border-radius: 5px;
-          margin: 20px 0;
-          font-weight: 500;
-          font-size: 16px;
-          text-align: center;
-          border: 2px solid #28a745;
-        }
-        .action-button:hover {
-          background-color: #218838;
-          border-color: #218838;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>✅ 报价回复</h1>
-        </div>
-        
-        <div class="content">
-          <div class="info-box">
-            <div class="info-row">
-              <span class="info-label">询价号:</span>
-              <span class="info-value quote-number">${escapeHtml(quote.quoteNumber)}</span>
-            </div>
 
-            <div class="info-row">
-              <span class="info-label">标题:</span>
-              <span class="info-value">${escapeHtml(quote.title)}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">报价:</span>
-              <span class="info-value price">${quote.price ? `${quote.price} ${quote.currency}` : '已报价'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">报价员留言:</span>
-              <span class="info-value">${escapeHtml(quote.quoterMessage) || '无'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">有效期至:</span>
-              <span class="info-value">${quote.validUntil ? quote.validUntil.toLocaleString('zh-CN') : '无限制'}</span>
-            </div>
-          </div>
-          
-          <p style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.FRONTEND_URL || '#'}/quote-view/${quote._id}" class="action-button">
-              查看报价详情
-            </a>
-          </p>
-        </div>
-        
-        <div class="footer">
-          <p>此邮件由询价系统自动发送，请勿回复。</p>
-          <p>如有疑问，请联系系统管理员。</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `,
 
   // 生成报价员分配供应商邮件模板
   quoterAssignmentNotification: (quote) => `
@@ -947,55 +805,9 @@ const createAttachments = (files) => {
   }).filter(Boolean);
 };
 
-// Send quote notification to quoters
-const sendQuoteNotification = async (quoterEmail, quote) => {
-  try {
-    const startTime = Date.now();
-    
-    const mailOptions = {
-      from: process.env.EMAIL_FROM,
-      to: quoterEmail,
-      subject: `新的询价请求 - ${quote.quoteNumber} - ${quote.title}`,
-      html: EmailTemplates.quoteNotification(quote),
-      attachments: createAttachments(quote.customerFiles)
-    };
 
-    const result = await sgMail.send(mailOptions);
-    const endTime = Date.now();
-    
-    logger.email('发送', quoterEmail, quote.quoteNumber, true, null);
-    
-    return result;
-  } catch (error) {
-    logger.email('发送', quoterEmail, quote.quoteNumber, false, error);
-    throw new Error(`邮件发送失败: ${error.message}`);
-  }
-};
 
-// Send quote response to customer
-const sendQuoteResponse = async (customerEmail, quote) => {
-  try {
-    const startTime = Date.now();
-    
-    const mailOptions = {
-      from: process.env.EMAIL_FROM,
-      to: customerEmail,
-      subject: `报价回复 - ${quote.quoteNumber} - ${quote.title}`,
-      html: EmailTemplates.quoteResponse(quote),
-      attachments: createAttachments(quote.quoterFiles)
-    };
 
-    const result = await sgMail.send(mailOptions);
-    const endTime = Date.now();
-    
-    logger.email('发送', customerEmail, quote.quoteNumber, true, null);
-    
-    return result;
-  } catch (error) {
-    logger.email('发送', customerEmail, quote.quoteNumber, false, error);
-    throw new Error(`邮件发送失败: ${error.message}`);
-  }
-};
 
 // Send password reset email
 const sendPasswordReset = async (email, resetToken) => {
@@ -1051,29 +863,7 @@ const sendQuoterAssignmentNotification = async (quoterEmail, quote) => {
   }
 };
 
-// 发送供应商报价通知邮件给报价员
-const sendSupplierQuoteNotification = async (quoterEmail, quote) => {
-  const startTime = Date.now();
-  
-  try {
-    const mailOptions = {
-      from: process.env.EMAIL_FROM,
-      to: quoterEmail,
-      subject: `供应商报价通知 - ${quote.quoteNumber}`,
-      html: EmailTemplates.supplierQuoteNotification(quote)
-    };
 
-    const result = await sgMail.send(mailOptions);
-    const endTime = Date.now();
-    
-    logger.email('发送', quoterEmail, quote.quoteNumber, true, null);
-    
-    return result;
-  } catch (error) {
-    logger.email('发送', quoterEmail, quote.quoteNumber, false, error);
-    throw new Error(`供应商报价通知邮件发送失败: ${error.message}`);
-  }
-};
 
 // 发送供应商确认报价邮件给报价员
 const sendSupplierQuotedNotification = async (quoterEmail, quote) => {
@@ -1125,9 +915,6 @@ const sendFinalQuoteNotification = async (customerEmail, quote) => {
 };
 
 module.exports = {
-  sendQuoteNotification,
-  sendQuoteResponse,
-  sendSupplierQuoteNotification,
   sendPasswordReset,
   sendQuoterAssignmentNotification,
   sendSupplierQuotedNotification,
