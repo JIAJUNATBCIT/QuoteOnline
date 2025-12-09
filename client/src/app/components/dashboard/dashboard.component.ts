@@ -27,11 +27,11 @@ export class DashboardComponent implements OnInit {
   // 状态选项
   statusOptions = [
     { value: '', label: '全部状态' },
+    { value: 'unquoted', label: '未报价' },
     { value: 'pending', label: '待处理' },
     { value: 'in_progress', label: '处理中' },
     { value: 'supplier_quoted', label: '核价中' },
     { value: 'quoted', label: '已报价' },
-    { value: 'cancelled', label: '已取消' },
     { value: 'rejected', label: '不报价' }
   ];
   
@@ -73,7 +73,12 @@ export class DashboardComponent implements OnInit {
     
     // 应用状态筛选
     if (this.selectedStatus) {
-      filtered = filtered.filter(quote => quote.status === this.selectedStatus);
+      if (this.selectedStatus === 'unquoted') {
+        // "未报价"选项：筛选出除"已报价"和"不报价"外的所有记录
+        filtered = filtered.filter(quote => quote.status !== 'quoted' && quote.status !== 'rejected');
+      } else {
+        filtered = filtered.filter(quote => quote.status === this.selectedStatus);
+      }
     }
     
     // 应用日期范围筛选
@@ -272,8 +277,6 @@ export class DashboardComponent implements OnInit {
         return '核价中';
       case 'quoted':
         return '已报价';
-      case 'cancelled':
-        return '已取消';
       case 'rejected':
         return '不报价';
       default:

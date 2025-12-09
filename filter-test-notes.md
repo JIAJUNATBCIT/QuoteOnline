@@ -16,7 +16,6 @@
 - 处理中 (in_progress)
 - 核价中 (supplier_quoted)
 - 已报价 (quoted)
-- 已取消 (cancelled)
 - 不报价 (rejected)
 
 ### 2. 日期范围筛选
@@ -46,7 +45,10 @@ dateRange = { start: '', end: '' };
 statusOptions = [
   { value: '', label: '全部状态' },
   { value: 'pending', label: '待处理' },
-  // ... 其他状态选项
+  { value: 'in_progress', label: '处理中' },
+  { value: 'supplier_quoted', label: '核价中' },
+  { value: 'quoted', label: '已报价' },
+  { value: 'rejected', label: '不报价' }
 ];
 
 // 新增方法
