@@ -478,6 +478,34 @@ router.put('/:id', auth, upload.fields([
             userId: req.user.userId
           });
         }
+        
+        // 如果删除的是报价员文件，且删除后没有文件了，且当前状态是"已报价"，则根据条件回退状态
+        if (fileType === 'quoter' && updatedFiles.length === 0 && quote.status === 'quoted') {
+          let newStatus = 'pending'; // 默认状态：待处理
+          
+          // 检查供应商是否已上传过报价文件
+          if (quote.supplierFiles && quote.supplierFiles.length > 0) {
+            newStatus = 'supplier_quoted'; // 若供应商上传过，退回到"核价中"
+          } else {
+            // 供应商没有上传过文件，检查是否已分配供应商群组
+            if (quote.assignedGroups && quote.assignedGroups.length > 0) {
+              newStatus = 'in_progress'; // 若已分配供应商群组，退回到"处理中"
+            } else {
+              newStatus = 'pending'; // 若没分配过供应商群组，退回到"待处理"
+            }
+          }
+          
+          updateData.status = newStatus;
+          logger.info(`报价员删除最后一个文件，状态自动回退`, {
+            quoteId: req.params.id,
+            oldStatus: 'quoted',
+            newStatus: newStatus,
+            hasSupplierFiles: !!(quote.supplierFiles && quote.supplierFiles.length > 0),
+            hasAssignedGroups: !!(quote.assignedGroups && quote.assignedGroups.length > 0),
+            assignedGroupsCount: quote.assignedGroups ? quote.assignedGroups.length : 0,
+            userId: req.user.userId
+          });
+        }
       }
     }
     // 处理整个文件数组删除（保留原有逻辑以兼容）
