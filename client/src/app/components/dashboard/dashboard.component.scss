@@ -407,6 +407,80 @@
 
 
 
+// 筛选控件样式
+.filter-section {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  
+  .filter-item {
+    display: flex;
+    flex-direction: column;
+    
+    label {
+      font-weight: 600;
+      color: #495057;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+    }
+    
+    .form-select,
+    .form-control {
+      border-radius: 8px;
+      border: 2px solid #e9ecef;
+      transition: all 0.3s ease;
+      
+      &:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+      }
+    }
+    
+    .btn-outline-secondary {
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      
+      &:hover {
+        background-color: #6c757d;
+        border-color: #6c757d;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+      }
+      
+      i {
+        transition: transform 0.3s ease;
+      }
+      
+      &:hover i {
+        transform: rotate(90deg);
+      }
+    }
+  }
+}
+
+// 筛选激活状态的视觉反馈
+.has-active-filters {
+  .filter-section {
+    background: linear-gradient(135deg, #e7f3ff 0%, #cce5ff 100%);
+    border-color: #007bff;
+    
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #007bff, #0056b3);
+      border-radius: 12px 12px 0 0;
+    }
+  }
+}
+
 // 询价单标题样式
 .quote-title {
   white-space: nowrap;
@@ -793,6 +867,20 @@
             font-size: 1.5rem;
           }
         }
+      }
+    }
+  }
+  
+  // 移动端筛选控件优化
+  .filter-section {
+    padding: 1rem;
+    
+    .filter-item {
+      min-width: calc(50% - 0.75rem);
+      
+      .form-select,
+      .form-control {
+        font-size: 0.875rem;
       }
     }
   }

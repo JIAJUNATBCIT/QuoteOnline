@@ -17,6 +17,24 @@ export class DashboardComponent implements OnInit {
   sortColumn = 'createdAt';
   sortDirection: 'asc' | 'desc' = 'desc';
   
+  // 筛选相关
+  selectedStatus = '';
+  dateRange = {
+    start: '',
+    end: ''
+  };
+  
+  // 状态选项
+  statusOptions = [
+    { value: '', label: '全部状态' },
+    { value: 'pending', label: '待处理' },
+    { value: 'in_progress', label: '处理中' },
+    { value: 'supplier_quoted', label: '核价中' },
+    { value: 'quoted', label: '已报价' },
+    { value: 'cancelled', label: '已取消' },
+    { value: 'rejected', label: '不报价' }
+  ];
+  
   // 分页相关
   currentPage = 1;
   itemsPerPage = 10;
@@ -53,9 +71,28 @@ export class DashboardComponent implements OnInit {
     // 应用搜索过滤
     let filtered = this.quotes;
     
+    // 应用状态筛选
+    if (this.selectedStatus) {
+      filtered = filtered.filter(quote => quote.status === this.selectedStatus);
+    }
+    
+    // 应用日期范围筛选
+    if (this.dateRange.start) {
+      const startDate = new Date(this.dateRange.start);
+      startDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(quote => new Date(quote.createdAt) >= startDate);
+    }
+    
+    if (this.dateRange.end) {
+      const endDate = new Date(this.dateRange.end);
+      endDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(quote => new Date(quote.createdAt) <= endDate);
+    }
+    
+    // 应用搜索过滤
     if (this.searchTerm.trim()) {
       const searchLower = this.searchTerm.toLowerCase().trim();
-      filtered = this.quotes.filter(quote => 
+      filtered = filtered.filter(quote => 
         quote.quoteNumber.toLowerCase().includes(searchLower) ||
         quote.title.toLowerCase().includes(searchLower) ||
         (quote.description && quote.description.toLowerCase().includes(searchLower)) ||
@@ -145,6 +182,28 @@ export class DashboardComponent implements OnInit {
 
   onSearchChange() {
     this.applyFiltersAndSort();
+  }
+
+  // 筛选相关方法
+  onStatusChange() {
+    this.applyFiltersAndSort();
+  }
+
+  onDateRangeChange() {
+    this.applyFiltersAndSort();
+  }
+
+  // 清除筛选条件
+  clearFilters() {
+    this.selectedStatus = '';
+    this.dateRange = { start: '', end: '' };
+    this.searchTerm = '';
+    this.applyFiltersAndSort();
+  }
+
+  // 检查是否有激活的筛选条件
+  hasActiveFilters(): boolean {
+    return !!(this.selectedStatus || this.dateRange.start || this.dateRange.end || this.searchTerm.trim());
   }
 
   // 分页相关方法

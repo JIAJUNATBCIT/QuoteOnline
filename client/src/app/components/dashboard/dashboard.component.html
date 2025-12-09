@@ -181,6 +181,63 @@
       </div>
     </div>
     <div class="card-body">
+      <!-- 筛选控件 -->
+      <div class="row mb-3 filter-section" [class.has-active-filters]="hasActiveFilters()">
+        <div class="col-12">
+          <div class="d-flex flex-wrap gap-3 align-items-end">
+            <!-- 状态筛选 -->
+            <div class="filter-item">
+              <label for="statusFilter" class="form-label small text-muted">状态筛选</label>
+              <select 
+                id="statusFilter" 
+                class="form-select form-select-sm"
+                style="min-width: 120px;"
+                [(ngModel)]="selectedStatus" 
+                (change)="onStatusChange()">
+                <option *ngFor="let option of statusOptions" [value]="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+
+            <!-- 日期范围筛选 -->
+            <div class="filter-item">
+              <label for="startDate" class="form-label small text-muted">开始日期</label>
+              <input 
+                type="date" 
+                id="startDate" 
+                class="form-control form-control-sm"
+                style="min-width: 150px;"
+                [(ngModel)]="dateRange.start" 
+                (change)="onDateRangeChange()">
+            </div>
+
+            <div class="filter-item">
+              <label for="endDate" class="form-label small text-muted">结束日期</label>
+              <input 
+                type="date" 
+                id="endDate" 
+                class="form-control form-control-sm"
+                style="min-width: 150px;"
+                [(ngModel)]="dateRange.end" 
+                (change)="onDateRangeChange()">
+            </div>
+
+            <!-- 清除筛选按钮 -->
+            <div class="filter-item" *ngIf="hasActiveFilters()">
+              <label class="form-label small text-muted">&nbsp;</label>
+              <button 
+                type="button" 
+                class="btn btn-outline-secondary btn-sm"
+                (click)="clearFilters()"
+                title="清除所有筛选条件">
+                <i class="bi bi-x-circle me-1"></i>清除筛选
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div *ngIf="loading" class="loading-spinner">
         <div class="spinner-border" role="status">
           <span class="visually-hidden">加载中...</span>
