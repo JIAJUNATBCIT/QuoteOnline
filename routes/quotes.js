@@ -736,15 +736,23 @@ router.patch('/:id/reject', auth, async (req, res) => {
     setImmediate(async () => {
       try {
         if (updatedQuote.customer && updatedQuote.customer.email) {
+          // 重新获取完整的询价单数据，确保包含 customerFiles
+          const fullQuote = await Quote.findById(updatedQuote._id)
+            .populate('customer', 'name email company')
+            .populate('quoter', 'name email company')
+            .populate('supplier', 'name email company');
+          
           await emailService.sendQuoteRejectionNotification(
             updatedQuote.customer.email, 
-            updatedQuote
+            fullQuote
           );
           
           logger.info(`不予报价通知邮件发送完成`, { 
             quoteId: updatedQuote._id,
             customerEmail: updatedQuote.customer.email,
-            rejectReason: rejectReason.trim()
+            rejectReason: rejectReason.trim(),
+            hasCustomerFiles: !!(fullQuote.customerFiles && fullQuote.customerFiles.length > 0),
+            customerFilesCount: fullQuote.customerFiles ? fullQuote.customerFiles.length : 0
           });
         }
       } catch (error) {
@@ -1394,15 +1402,23 @@ router.patch('/:id/confirm-supplier-quote', auth, async (req, res) => {
     setImmediate(async () => {
       try {
         if (updatedQuote.customer && updatedQuote.customer.email) {
+          // 重新获取完整的询价单数据，确保包含 customerFiles
+          const fullQuote = await Quote.findById(updatedQuote._id)
+            .populate('customer', 'name email company')
+            .populate('quoter', 'name email company')
+            .populate('supplier', 'name email company');
+          
           await emailService.sendQuoteRejectionNotification(
             updatedQuote.customer.email, 
-            updatedQuote
+            fullQuote
           );
           
           logger.info(`不予报价通知邮件发送完成`, { 
             quoteId: updatedQuote._id,
             customerEmail: updatedQuote.customer.email,
-            rejectReason: rejectReason.trim()
+            rejectReason: rejectReason.trim(),
+            hasCustomerFiles: !!(fullQuote.customerFiles && fullQuote.customerFiles.length > 0),
+            customerFilesCount: fullQuote.customerFiles ? fullQuote.customerFiles.length : 0
           });
         }
       } catch (error) {
@@ -1459,10 +1475,18 @@ router.patch('/:id/confirm-final-quote', auth, async (req, res) => {
     setImmediate(async () => {
       try {
         if (updatedQuote.customer && updatedQuote.customer.email) {
-          await emailService.sendFinalQuoteNotification(updatedQuote.customer.email, updatedQuote);
+          // 重新获取完整的询价单数据，确保包含 quoterFiles
+          const fullQuote = await Quote.findById(updatedQuote._id)
+            .populate('customer', 'name email company')
+            .populate('quoter', 'name email company')
+            .populate('supplier', 'name email company');
+          
+          await emailService.sendFinalQuoteNotification(updatedQuote.customer.email, fullQuote);
           logger.info(`最终报价确认邮件发送完成`, { 
             customerEmail: updatedQuote.customer.email,
-            quoteNumber: updatedQuote.quoteNumber
+            quoteNumber: updatedQuote.quoteNumber,
+            hasQuoterFiles: !!(fullQuote.quoterFiles && fullQuote.quoterFiles.length > 0),
+            quoterFilesCount: fullQuote.quoterFiles ? fullQuote.quoterFiles.length : 0
           });
         }
       } catch (error) {
@@ -1477,15 +1501,23 @@ router.patch('/:id/confirm-final-quote', auth, async (req, res) => {
     setImmediate(async () => {
       try {
         if (updatedQuote.customer && updatedQuote.customer.email) {
+          // 重新获取完整的询价单数据，确保包含 customerFiles
+          const fullQuote = await Quote.findById(updatedQuote._id)
+            .populate('customer', 'name email company')
+            .populate('quoter', 'name email company')
+            .populate('supplier', 'name email company');
+          
           await emailService.sendQuoteRejectionNotification(
             updatedQuote.customer.email, 
-            updatedQuote
+            fullQuote
           );
           
           logger.info(`不予报价通知邮件发送完成`, { 
             quoteId: updatedQuote._id,
             customerEmail: updatedQuote.customer.email,
-            rejectReason: rejectReason.trim()
+            rejectReason: rejectReason.trim(),
+            hasCustomerFiles: !!(fullQuote.customerFiles && fullQuote.customerFiles.length > 0),
+            customerFilesCount: fullQuote.customerFiles ? fullQuote.customerFiles.length : 0
           });
         }
       } catch (error) {
