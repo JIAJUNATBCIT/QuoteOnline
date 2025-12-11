@@ -31,9 +31,9 @@ export class ConfigService {
     }
 
     try {
-      // 检测开发环境并使用适当的API URL
-      const isDevelopment = window.location.hostname === 'localhost' && 
-                          (window.location.port === '4200' || window.location.port === '4201');
+      // 简化环境检测：只针对本地开发环境
+      const isDevelopment = window.location.hostname === 'localhost' || 
+                          window.location.hostname === '127.0.0.1';
       const configUrl = isDevelopment ? 'http://localhost:3000/api/config/frontend' : '/api/config/frontend';
       
       const response: any = await this.http.get(configUrl).toPromise();
@@ -47,9 +47,9 @@ export class ConfigService {
     } catch (error) {
       console.error('配置加载失败，使用默认配置:', error);
 
-      // 默认配置 - 开发环境检测更严格
-      const isDevelopment = window.location.hostname === 'localhost' && 
-                          (window.location.port === '4200' || window.location.port === '4201');
+      // 默认配置 - 简化环境检测
+      const isDevelopment = window.location.hostname === 'localhost' || 
+                          window.location.hostname === '127.0.0.1';
       const defaultConfig: FrontendConfig = {
         apiUrl: isDevelopment ? 'http://localhost:3000/api' : '/api',
         frontendUrl: window.location.origin,
