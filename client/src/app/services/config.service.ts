@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject } from 'rxjs';
-import { environment } from 'environment';
+import { environment } from '../../environments/environment';
 
 export interface FrontendConfig {
   apiUrl: string;
@@ -47,7 +47,7 @@ export class ConfigService {
     } catch (error) {
       console.error('配置加载失败，使用默认配置:', error);
 
-      // 默认配置 - 开发环境使用绝对URL
+      // 默认配置 - 开发环境检测更严格
       const isDevelopment = window.location.hostname === 'localhost' && 
                           (window.location.port === '4200' || window.location.port === '4201');
       const defaultConfig: FrontendConfig = {
@@ -59,6 +59,7 @@ export class ConfigService {
         allowedFileExtensions: ['.xlsx', '.xls']
       };
 
+      console.log('使用默认配置:', defaultConfig);
       this.config = defaultConfig;
       this.configSubject.next(this.config);
       return this.config;
