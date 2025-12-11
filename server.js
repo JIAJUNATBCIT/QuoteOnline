@@ -2,9 +2,9 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+require('dotenv').config(); // 首先加载环境变量
 const logger = require('./utils/logger');
-const config = require('./config/config');
-require('dotenv').config();
+const config = require('./config/config'); // 然后加载配置
 
 const app = express();
 
