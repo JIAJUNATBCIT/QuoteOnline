@@ -1,10 +1,11 @@
-import { NgModule, ErrorHandler } from '@angular/core';
+import { NgModule, ErrorHandler, APP_INITIALIZER } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { GlobalErrorHandler } from './error.handler';
+import { ConfigService } from './services/config.service';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -49,6 +50,16 @@ import { DevToolsComponent } from './components/dev-tools/dev-tools.component';
             provide: ErrorHandler,
             useClass: GlobalErrorHandler
         },
+        {
+            provide: APP_INITIALIZER,
+            useFactory: initializeConfig,
+            deps: [ConfigService],
+            multi: true
+        },
         provideHttpClient(withInterceptorsFromDi())
     ] })
+export function initializeConfig(configService: ConfigService) {
+  return () => configService.loadConfig();
+}
+
 export class AppModule { }

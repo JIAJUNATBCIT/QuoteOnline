@@ -3,18 +3,31 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const logger = require('./utils/logger');
+const config = require('./config/config');
 require('dotenv').config();
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// CORS配置
+app.use(cors({
+  origin: config.cors.origins,
+  credentials: config.cors.credentials,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 
 // Cookie parser middleware
 app.use(require('cookie-parser')());
 
-app.use(express.json({ limit: '10mb' })); 
-app.use(express.urlencoded({ extended: true, limit: '10mb', parameterLimit: 1000 }));
+app.use(express.json({ 
+  limit: `${config.server.maxFileSize}mb`,
+  type: ['application/json', 'text/plain']
+})); 
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: `${config.server.maxFileSize}mb`, 
+  parameterLimit: 1000 
+}));
 
 // 请求时间记录中间件
 app.use((req, res, next) => {
@@ -29,7 +42,7 @@ app.use((req, res, next) => {
   });
   
   // 请求超时处理
-  res.setTimeout(60000, () => { // 增加到60秒，适应文件上传
+  res.setTimeout(config.server.timeout, () => {
     logger.error(`请求超时: ${req.method} ${req.url}`, {
       method: req.method,
       url: req.url,
@@ -59,14 +72,10 @@ app.use((req, res, next) => {
 });
 
 // Serve static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(config.frontend.uploadUrl, express.static(path.join(__dirname, config.server.uploadPath)));
 
 // Connect to MongoDB with optimized settings
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/quoteonline', {
-  maxPoolSize: 10, // 连接池最大连接数
-  serverSelectionTimeoutMS: 5000, // 服务器选择超时
-  socketTimeoutMS: 45000, // Socket超时
-})
+mongoose.connect(config.mongodb.uri, config.mongodb.options)
 .then(() => {
   logger.info('MongoDB 连接成功');
   
@@ -90,6 +99,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/quotes', require('./routes/quotes'));
 app.use('/api/groups', require('./routes/groups'));
+app.use('/api/config', require('./routes/config'));
 
 // Serve Angular app in production
 if (process.env.NODE_ENV === 'production') {
