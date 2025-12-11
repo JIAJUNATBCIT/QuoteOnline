@@ -15,8 +15,8 @@ export interface FrontendConfig {
   providedIn: 'root'
 })
 export class ConfigService {
-  private config: FrontendConfig | null = null;
-  private configSubject = new BehaviorSubject<FrontendConfig | null>(null);
+  private config: FrontendConfig;
+  private configSubject = new BehaviorSubject<FrontendConfig>({} as FrontendConfig);
   public config$ = this.configSubject.asObservable();
 
   constructor(private http: HttpClient) {}
@@ -25,7 +25,7 @@ export class ConfigService {
    * 加载配置
    */
   async loadConfig(): Promise<FrontendConfig> {
-    if (this.config) {
+    if (this.config && this.config.apiUrl) {
       return this.config;
     }
 
@@ -59,42 +59,42 @@ export class ConfigService {
    * 获取API URL
    */
   getApiUrl(): string {
-    return this.config?.apiUrl || '/api';
+    return this.config.apiUrl || '/api';
   }
 
   /**
    * 获取前端URL
    */
   getFrontendUrl(): string {
-    return this.config?.frontendUrl || window.location.origin;
+    return this.config.frontendUrl || window.location.origin;
   }
 
   /**
    * 获取上传URL
    */
   getUploadUrl(): string {
-    return this.config?.uploadUrl || '/uploads';
+    return this.config.uploadUrl || '/uploads';
   }
 
   /**
    * 获取最大文件大小
    */
   getMaxFileSize(): number {
-    return this.config?.maxFileSize || 10485760;
+    return this.config.maxFileSize || 10485760;
   }
 
   /**
    * 获取最大文件数量
    */
   getMaxFilesCount(): number {
-    return this.config?.maxFilesCount || 10;
+    return this.config.maxFilesCount || 10;
   }
 
   /**
    * 获取允许的文件扩展名
    */
   getAllowedFileExtensions(): string[] {
-    return this.config?.allowedFileExtensions || ['.xlsx', '.xls'];
+    return this.config.allowedFileExtensions || ['.xlsx', '.xls'];
   }
 
   /**
