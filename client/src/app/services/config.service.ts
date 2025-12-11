@@ -83,7 +83,15 @@ export class ConfigService {
   // ------------------------------
 
   getApiUrl(): string {
-    return this.config.apiUrl || '/api';
+    // 如果配置已加载，使用配置的 URL
+    if (this.config && this.config.apiUrl) {
+      return this.config.apiUrl;
+    }
+    
+    // 否则根据当前环境动态判断
+    const isDevelopment = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1';
+    return isDevelopment ? 'http://localhost:3000/api' : '/api';
   }
 
   getFrontendUrl(): string {
@@ -91,7 +99,15 @@ export class ConfigService {
   }
 
   getUploadUrl(): string {
-    return this.config.uploadUrl || '/uploads';
+    // 如果配置已加载，使用配置的 URL
+    if (this.config && this.config.uploadUrl) {
+      return this.config.uploadUrl;
+    }
+    
+    // 否则根据当前环境动态判断
+    const isDevelopment = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1';
+    return isDevelopment ? 'http://localhost:3000/uploads' : '/uploads';
   }
 
   getMaxFileSize(): number {
