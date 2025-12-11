@@ -21,45 +21,49 @@ import { NavbarComponent } from './components/navbar/navbar.component';
 import { FilterPipe } from './pipes/filter.pipe';
 import { DevToolsComponent } from './components/dev-tools/dev-tools.component';
 
-
-
-@NgModule({ declarations: [
-        AppComponent,
-        LoginComponent,
-        RegisterComponent,
-        DashboardComponent,
-        QuoteRedirectComponent,
-        ForgotPasswordComponent,
-        ResetPasswordComponent,
-        NavbarComponent,
-        FilterPipe,
-        DevToolsComponent,
-    ],
-    bootstrap: [AppComponent], imports: [BrowserModule,
-        AppRoutingModule,
-        ReactiveFormsModule,
-        FormsModule,
-        CommonModule,
-        NgbModule],     providers: [
-        {
-            provide: HTTP_INTERCEPTORS,
-            useClass: AuthInterceptor,
-            multi: true
-        },
-        {
-            provide: ErrorHandler,
-            useClass: GlobalErrorHandler
-        },
-        {
-            provide: APP_INITIALIZER,
-            useFactory: initializeConfig,
-            deps: [ConfigService],
-            multi: true
-        },
-        provideHttpClient(withInterceptorsFromDi())
-    ] })
 export function initializeConfig(configService: ConfigService) {
   return () => configService.loadConfig();
 }
 
+@NgModule({
+  declarations: [
+    AppComponent,
+    LoginComponent,
+    RegisterComponent,
+    DashboardComponent,
+    QuoteRedirectComponent,
+    ForgotPasswordComponent,
+    ResetPasswordComponent,
+    NavbarComponent,
+    FilterPipe,
+    DevToolsComponent,
+  ],
+  bootstrap: [AppComponent],
+  imports: [
+    BrowserModule,
+    AppRoutingModule,
+    ReactiveFormsModule,
+    FormsModule,
+    CommonModule,
+    NgbModule
+  ],
+  providers: [
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: AuthInterceptor,
+      multi: true
+    },
+    {
+      provide: ErrorHandler,
+      useClass: GlobalErrorHandler
+    },
+    {
+      provide: APP_INITIALIZER,
+      useFactory: initializeConfig,
+      deps: [ConfigService],
+      multi: true
+    },
+    provideHttpClient(withInterceptorsFromDi())
+  ]
+})
 export class AppModule { }

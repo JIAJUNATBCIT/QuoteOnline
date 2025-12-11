@@ -15,7 +15,7 @@ export interface FrontendConfig {
   providedIn: 'root'
 })
 export class ConfigService {
-  private config: FrontendConfig;
+  private config!: FrontendConfig;
   private configSubject = new BehaviorSubject<FrontendConfig>({} as FrontendConfig);
   public config$ = this.configSubject.asObservable();
 
