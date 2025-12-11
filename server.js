@@ -3,12 +3,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const logger = require('./utils/logger');
-
-// 首先加载环境变量
-require('dotenv').config();
-
-// 然后加载配置（确保环境变量已加载）
 const config = require('./config/config');
+require('dotenv').config();
 
 const app = express();
 
@@ -45,6 +41,16 @@ app.use((req, res, next) => {
     userAgent: req.get('User-Agent')
   });
   
+  // 特殊调试登录请求
+  if (req.path === '/api/auth/login') {
+    console.log('🔍 LOGIN REQUEST DETECTED:', {
+      method: req.method,
+      url: req.url,
+      body: req.body,
+      headers: req.headers
+    });
+  }
+  
   // 请求超时处理
   res.setTimeout(config.server.timeout, () => {
     logger.error(`请求超时: ${req.method} ${req.url}`, {
@@ -79,78 +85,73 @@ app.use((req, res, next) => {
 app.use(config.frontend.uploadUrl, express.static(path.join(__dirname, config.server.uploadPath)));
 
 // Connect to MongoDB with optimized settings
+mongoose.connection.on('connected', () => {
+  logger.info('MongoDB 连接已建立');
+});
+
+mongoose.connection.on('error', (err) => {
+  logger.error('MongoDB 连接错误', { error: err.message });
+});
+
+mongoose.connection.on('disconnected', () => {
+  logger.warn('MongoDB 连接已断开');
+});
+
 mongoose.connect(config.mongodb.uri, config.mongodb.options)
 .then(() => {
   logger.info('MongoDB 连接成功');
   
-  // 监听连接事件
-  mongoose.connection.on('connected', () => {
-    logger.info('MongoDB 连接已建立');
+  // Routes
+  app.use('/api/auth', require('./routes/auth'));
+  app.use('/api/users', require('./routes/users'));
+  app.use('/api/quotes', require('./routes/quotes'));
+  app.use('/api/groups', require('./routes/groups'));
+  app.use('/api/config', require('./routes/config'));
+
+  // Serve Angular app in production
+  if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, 'client/dist')));
+    
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(__dirname, 'client/dist/index.html'));
+    });
+  }
+
+  const PORT = process.env.PORT || 3000;
+  const server = app.listen(PORT, () => {
+    logger.info(`服务器启动成功`, { port: PORT, env: process.env.NODE_ENV });
   });
-  
-  mongoose.connection.on('error', (err) => {
-    logger.error('MongoDB 连接错误', { error: err.message });
+
+  // 设置服务器超时
+  server.timeout = 30000; // 30秒
+  server.keepAliveTimeout = 65000; // 65秒
+  server.headersTimeout = 66000; // 66秒
+
+  // 优雅关闭
+  process.on('SIGTERM', async () => {
+    logger.info('收到 SIGTERM 信号，开始优雅关闭...');
+    server.close(async () => {
+      logger.info('HTTP 服务器已关闭');
+      await mongoose.connection.close();
+      logger.info('MongoDB 连接已关闭');
+      process.exit(0);
+    });
   });
-  
-  mongoose.connection.on('disconnected', () => {
-    logger.warn('MongoDB 连接已断开');
+
+  process.on('SIGINT', async () => {
+    logger.info('收到 SIGINT 信号，开始优雅关闭...');
+    server.close(async () => {
+      logger.info('HTTP 服务器已关闭');
+      await mongoose.connection.close();
+      logger.info('MongoDB 连接已关闭');
+      process.exit(0);
+    });
   });
+
 })
-.catch(err => logger.error('MongoDB 连接失败', { error: err.message }));
-
-// Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api/quotes', require('./routes/quotes'));
-app.use('/api/groups', require('./routes/groups'));
-app.use('/api/config', require('./routes/config'));
-
-// Serve Angular app in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'client/dist')));
-  
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/dist/index.html'));
-  });
-}
-
-const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
-  logger.info(`服务器启动成功`, { port: PORT, env: process.env.NODE_ENV });
-});
-
-// 设置服务器超时
-server.timeout = 30000; // 30秒
-server.keepAliveTimeout = 65000; // 65秒
-server.headersTimeout = 66000; // 66秒
-
-// 优雅关闭
-process.on('SIGTERM', async () => {
-  logger.info('收到 SIGTERM 信号，开始优雅关闭...');
-  server.close(async () => {
-    logger.info('HTTP 服务器已关闭');
-    try {
-      await mongoose.connection.close();
-      logger.info('MongoDB 连接已关闭');
-    } catch (error) {
-      logger.error('关闭 MongoDB 连接时出错', { error: error.message });
-    }
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', async () => {
-  logger.info('收到 SIGINT 信号，开始优雅关闭...');
-  server.close(async () => {
-    logger.info('HTTP 服务器已关闭');
-    try {
-      await mongoose.connection.close();
-      logger.info('MongoDB 连接已关闭');
-    } catch (error) {
-      logger.error('关闭 MongoDB 连接时出错', { error: error.message });
-    }
-    process.exit(0);
-  });
+.catch(err => {
+  logger.error('MongoDB 连接失败', { error: err.message });
+  process.exit(1);
 });
 
 // 未捕获的异常处理

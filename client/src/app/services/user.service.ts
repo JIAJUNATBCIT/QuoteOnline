@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ConfigService } from './config.service';
 
 
 export interface User {
@@ -19,38 +20,49 @@ export interface User {
   providedIn: 'root'
 })
 export class UserService {
-  constructor(private http: HttpClient) { }
+  constructor(
+    private http: HttpClient,
+    private configService: ConfigService
+  ) { }
 
   getAllUsers(): Observable<User[]> {
-    return this.http.get<User[]>(`/api/users`);
+    const url = this.configService.buildApiUrl('/users');
+    return this.http.get<User[]>(url);
   }
 
   getUserById(id: string): Observable<User> {
-    return this.http.get<User>(`/api/users/${id}`);
+    const url = this.configService.buildApiUrl(`/users/${id}`);
+    return this.http.get<User>(url);
   }
 
   updateUserRole(id: string, role: string): Observable<User> {
-    return this.http.patch<User>(`/api/users/${id}/role`, { role });
+    const url = this.configService.buildApiUrl(`/users/${id}/role`);
+    return this.http.patch<User>(url, { role });
   }
 
   getSuppliers(): Observable<User[]> {
-    return this.http.get<User[]>(`/api/users/suppliers`);
+    const url = this.configService.buildApiUrl('/users/suppliers');
+    return this.http.get<User[]>(url);
   }
 
   updateUserProfile(id: string, profileData: any): Observable<User> {
-    return this.http.put<User>(`/api/users/${id}`, profileData);
+    const url = this.configService.buildApiUrl(`/users/${id}`);
+    return this.http.put<User>(url, profileData);
   }
 
   deleteUser(id: string): Observable<any> {
-    return this.http.delete(`/api/users/${id}`);
+    const url = this.configService.buildApiUrl(`/users/${id}`);
+    return this.http.delete(url);
   }
 
   changePassword(id: string, passwordData: { currentPassword: string; newPassword: string }): Observable<any> {
-    return this.http.patch(`/api/users/${id}/password`, passwordData);
+    const url = this.configService.buildApiUrl(`/users/${id}/password`);
+    return this.http.patch(url, passwordData);
   }
 
   // 管理员修改用户密码
   adminChangePassword(id: string, newPassword: string): Observable<any> {
-    return this.http.patch(`/api/users/${id}/password`, { newPassword });
+    const url = this.configService.buildApiUrl(`/users/${id}/password`);
+    return this.http.patch(url, { newPassword });
   }
 }

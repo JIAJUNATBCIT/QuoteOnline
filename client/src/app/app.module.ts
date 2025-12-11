@@ -38,7 +38,6 @@ export function initializeConfig(configService: ConfigService) {
     FilterPipe,
     DevToolsComponent,
   ],
-  bootstrap: [AppComponent],
   imports: [
     BrowserModule,
     AppRoutingModule,
@@ -64,6 +63,7 @@ export function initializeConfig(configService: ConfigService) {
       multi: true
     },
     provideHttpClient(withInterceptorsFromDi())
-  ]
+  ],
+  bootstrap: [AppComponent]
 })
-export class AppModule { }
+export class AppModule {}

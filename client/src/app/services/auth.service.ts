@@ -5,6 +5,7 @@ import { tap, catchError } from 'rxjs/operators';
 
 import { User, AuthResponse } from '../utils/user.types';
 import { TokenService } from './token.service';
+import { ConfigService } from './config.service';
 import { Router } from '@angular/router';
 
 @Injectable({
@@ -17,6 +18,7 @@ export class AuthService {
   constructor(
     private http: HttpClient,
     private tokenService: TokenService,
+    private configService: ConfigService,
     private router: Router
   ) {
     this.loadUserFromStorage();
@@ -38,7 +40,8 @@ export class AuthService {
   }
 
   login(email: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`/api/auth/login`, { email, password })
+    const url = this.configService.buildApiUrl('/auth/login');
+    return this.http.post<AuthResponse>(url, { email, password })
       .pipe(
         tap(response => {
           if (response.accessToken && response.refreshToken && response.user) {
@@ -51,7 +54,8 @@ export class AuthService {
   }
 
   register(userData: any): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`/api/auth/register`, userData)
+    const url = this.configService.buildApiUrl('/auth/register');
+    return this.http.post<AuthResponse>(url, userData)
       .pipe(
         tap(response => {
           if (response.accessToken && response.refreshToken && response.user) {
@@ -94,10 +98,12 @@ export class AuthService {
   }
 
   forgotPassword(email: string): Observable<any> {
-    return this.http.post(`/api/auth/forgot-password`, { email });
+    const url = this.configService.buildApiUrl('/auth/forgot-password');
+    return this.http.post(url, { email });
   }
 
   resetPassword(token: string, newPassword: string): Observable<any> {
-    return this.http.post(`/api/auth/reset-password`, { token, newPassword });
+    const url = this.configService.buildApiUrl('/auth/reset-password');
+    return this.http.post(url, { token, newPassword });
   }
 }

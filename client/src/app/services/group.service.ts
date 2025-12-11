@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ConfigService } from './config.service';
 
 
 export interface Group {
@@ -41,42 +42,50 @@ export interface UpdateGroupData {
   providedIn: 'root'
 })
 export class GroupService {
-  private readonly apiUrl = '/api/groups';
-
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private configService: ConfigService
+  ) {}
 
   // 获取所有群组
   getAllGroups(): Observable<Group[]> {
-    return this.http.get<Group[]>(this.apiUrl);
+    const url = this.configService.buildApiUrl('/groups');
+    return this.http.get<Group[]>(url);
   }
 
   // 获取群组详情
   getGroupById(id: string): Observable<Group> {
-    return this.http.get<Group>(`${this.apiUrl}/${id}`);
+    const url = this.configService.buildApiUrl(`/groups/${id}`);
+    return this.http.get<Group>(url);
   }
 
   // 创建群组
   createGroup(groupData: CreateGroupData): Observable<Group> {
-    return this.http.post<Group>(this.apiUrl, groupData);
+    const url = this.configService.buildApiUrl('/groups');
+    return this.http.post<Group>(url, groupData);
   }
 
   // 更新群组
   updateGroup(id: string, groupData: UpdateGroupData): Observable<Group> {
-    return this.http.put<Group>(`${this.apiUrl}/${id}`, groupData);
+    const url = this.configService.buildApiUrl(`/groups/${id}`);
+    return this.http.put<Group>(url, groupData);
   }
 
   // 删除群组
   deleteGroup(id: string): Observable<{ message: string }> {
-    return this.http.delete<{ message: string }>(`${this.apiUrl}/${id}`);
+    const url = this.configService.buildApiUrl(`/groups/${id}`);
+    return this.http.delete<{ message: string }>(url);
   }
 
   // 分配用户到群组
   assignUsersToGroup(groupId: string, userIds: string[]): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/${groupId}/users`, { userIds });
+    const url = this.configService.buildApiUrl(`/groups/${groupId}/users`);
+    return this.http.post<{ message: string }>(url, { userIds });
   }
 
   // 从群组移除用户
   removeUserFromGroup(groupId: string, userId: string): Observable<{ message: string }> {
-    return this.http.delete<{ message: string }>(`${this.apiUrl}/${groupId}/users/${userId}`);
+    const url = this.configService.buildApiUrl(`/groups/${groupId}/users/${userId}`);
+    return this.http.delete<{ message: string }>(url);
   }
 }

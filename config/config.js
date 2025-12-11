@@ -49,11 +49,12 @@ const environments = {
   development: {
     // 数据库
     mongodb: {
-      uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/quoteonline_dev',
+      uri: process.env.MONGODB_URI,
       options: {
         maxPoolSize: 5,
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 60000,
+        connectTimeoutMS: 10000
       }
     },
     
@@ -88,11 +89,12 @@ const environments = {
   production: {
     // 数据库
     mongodb: {
-      uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/quoteonline',
+      uri: process.env.MONGODB_URI,
       options: {
         maxPoolSize: 10,
         serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000
+        socketTimeoutMS: 45000,
+        connectTimeoutMS: 5000
       }
     },
     
@@ -127,11 +129,12 @@ const environments = {
   test: {
     // 测试环境配置
     mongodb: {
-      uri: process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/quoteonline_test',
+      uri: process.env.MONGODB_URI,
       options: {
         maxPoolSize: 1,
         serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000
+        socketTimeoutMS: 45000,
+        connectTimeoutMS: 5000
       }
     },
     

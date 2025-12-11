@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { QuoteService, Quote } from '../../services/quote.service';
 import { AuthService } from '../../services/auth.service';
 import { PermissionService } from '../../services/permission.service';
+import { ConfigService } from '../../services/config.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -43,10 +44,19 @@ export class DashboardComponent implements OnInit {
   constructor(
     public authService: AuthService,
     private quoteService: QuoteService,
-    private permissionService: PermissionService
+    private permissionService: PermissionService,
+    private configService: ConfigService
   ) { }
 
-  ngOnInit() {
+  async ngOnInit() {
+    // 先加载配置
+    try {
+      await this.configService.loadConfig();
+      console.log('Dashboard - API URL:', this.configService.getApiUrl());
+    } catch (error) {
+      console.error('Dashboard - 配置加载失败:', error);
+    }
+    
     this.loadQuotes();
   }
 

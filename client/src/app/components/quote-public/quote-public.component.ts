@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { QuoteService, Quote } from '../../services/quote.service';
+import { ConfigService } from '../../services/config.service';
 
 
 @Component({
@@ -16,7 +17,8 @@ export class QuotePublicComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private quoteService: QuoteService
+    private quoteService: QuoteService,
+    private configService: ConfigService
   ) {}
 
   ngOnInit() {
@@ -55,7 +57,7 @@ export class QuotePublicComponent implements OnInit {
 
   downloadCustomerFile() {
     if (this.quote?.customerFiles?.length > 0) {
-      window.open(`/api/quotes/public/${this.quote._id}/download/customer`, '_blank');
+      window.open(`${this.configService.buildApiUrl('/quotes/public')}/${this.quote._id}/download/customer`, '_blank');
     }
   }
 

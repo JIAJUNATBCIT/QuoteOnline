@@ -4,6 +4,7 @@ import { BehaviorSubject, Observable, timer, fromEvent, of } from 'rxjs';
 import { switchMap, catchError, take, startWith } from 'rxjs/operators';
 
 import { TokenResponse } from '../utils/user.types';
+import { ConfigService } from './config.service';
 
 @Injectable({
   providedIn: 'root'
@@ -17,7 +18,10 @@ export class TokenService {
   private isRefreshing = false;
   private refreshTokenSubject: BehaviorSubject<string | null> = new BehaviorSubject<string | null>(null);
 
-  constructor(private http: HttpClient) {
+  constructor(
+    private http: HttpClient,
+    private configService: ConfigService
+  ) {
     // 延迟初始化定时器，避免在构造函数中立即执行
     setTimeout(() => {
       this.startTokenRefreshTimer();
@@ -104,7 +108,8 @@ export class TokenService {
       'X-Skip-Interceptor': 'true' // 添加自定义头部标识
     };
     
-    return this.http.post<TokenResponse>(`/api/auth/refresh`, {}, { headers }).pipe(
+    const url = this.configService.buildApiUrl('/auth/refresh');
+    return this.http.post<TokenResponse>(url, {}, { headers }).pipe(
       switchMap((response: TokenResponse) => {
         this.isRefreshing = false;
         this.setAccessToken(response.accessToken);

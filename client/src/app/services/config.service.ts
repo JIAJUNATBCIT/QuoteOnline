@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
+import { environment } from 'environment';
 
 export interface FrontendConfig {
   apiUrl: string;
@@ -30,25 +31,34 @@ export class ConfigService {
     }
 
     try {
-      const response: any = await this.http.get('/api/config/frontend').toPromise();
-      this.config = response.data;
-      this.configSubject.next(this.config);
+      // 检测开发环境并使用适当的API URL
+      const isDevelopment = window.location.hostname === 'localhost' && 
+                          (window.location.port === '4200' || window.location.port === '4201');
+      const configUrl = isDevelopment ? 'http://localhost:3000/api/config/frontend' : '/api/config/frontend';
       
+      const response: any = await this.http.get(configUrl).toPromise();
+      
+      // 处理后端返回结构
+      this.config = response?.data || response;
+      this.configSubject.next(this.config);
+
       console.log('配置加载成功:', this.config);
       return this.config;
     } catch (error) {
       console.error('配置加载失败，使用默认配置:', error);
-      
-      // 默认配置
+
+      // 默认配置 - 开发环境使用绝对URL
+      const isDevelopment = window.location.hostname === 'localhost' && 
+                          (window.location.port === '4200' || window.location.port === '4201');
       const defaultConfig: FrontendConfig = {
-        apiUrl: '/api',
+        apiUrl: isDevelopment ? 'http://localhost:3000/api' : '/api',
         frontendUrl: window.location.origin,
-        uploadUrl: '/uploads',
+        uploadUrl: isDevelopment ? 'http://localhost:3000/uploads' : '/uploads',
         maxFileSize: 10485760, // 10MB
         maxFilesCount: 10,
         allowedFileExtensions: ['.xlsx', '.xls']
       };
-      
+
       this.config = defaultConfig;
       this.configSubject.next(this.config);
       return this.config;
@@ -56,66 +66,55 @@ export class ConfigService {
   }
 
   /**
-   * 获取API URL
+   * 根据环境选择 API 基础 URL
    */
+  private getApiBase(): string {
+    // 如果运行在开发环境（4200），前端 proxy 会转发到 Node
+    if (window.location.port === '4200') {
+      return '/api';
+    }
+    // 生产环境同域名直接访问 /api
+    return '/api';
+  }
+
+  // ------------------------------
+  // 其他工具方法保持原样
+  // ------------------------------
+
   getApiUrl(): string {
     return this.config.apiUrl || '/api';
   }
 
-  /**
-   * 获取前端URL
-   */
   getFrontendUrl(): string {
     return this.config.frontendUrl || window.location.origin;
   }
 
-  /**
-   * 获取上传URL
-   */
   getUploadUrl(): string {
     return this.config.uploadUrl || '/uploads';
   }
 
-  /**
-   * 获取最大文件大小
-   */
   getMaxFileSize(): number {
     return this.config.maxFileSize || 10485760;
   }
 
-  /**
-   * 获取最大文件数量
-   */
   getMaxFilesCount(): number {
     return this.config.maxFilesCount || 10;
   }
 
-  /**
-   * 获取允许的文件扩展名
-   */
   getAllowedFileExtensions(): string[] {
     return this.config.allowedFileExtensions || ['.xlsx', '.xls'];
   }
 
-  /**
-   * 生成完整的URL
-   */
   buildUrl(path: string): string {
     const baseUrl = this.getFrontendUrl();
     return `${baseUrl}${path.startsWith('/') ? path : '/' + path}`;
   }
 
-  /**
-   * 生成API URL
-   */
   buildApiUrl(path: string): string {
     const baseUrl = this.getApiUrl();
     return `${baseUrl}${path.startsWith('/') ? path : '/' + path}`;
   }
 
-  /**
-   * 生成文件下载URL
-   */
   buildFileUrl(fileType: string, quoteId: string, fileIndex?: number): string {
     const baseUrl = this.getApiUrl();
     if (fileIndex !== undefined) {
@@ -124,26 +123,17 @@ export class ConfigService {
     return `${baseUrl}/quotes/${quoteId}/download/${fileType}`;
   }
 
-  /**
-   * 检查文件是否允许上传
-   */
   isFileAllowed(filename: string): boolean {
     const extension = this.getFileExtension(filename);
     return this.getAllowedFileExtensions().includes(extension);
   }
 
-  /**
-   * 获取文件扩展名
-   */
   private getFileExtension(filename: string): string {
     const lastDot = filename.lastIndexOf('.');
     if (lastDot === -1) return '';
     return filename.substring(lastDot).toLowerCase();
   }
 
-  /**
-   * 格式化文件大小显示
-   */
   formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
