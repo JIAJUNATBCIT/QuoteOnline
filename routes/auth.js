@@ -12,54 +12,10 @@ const router = express.Router();
 
 // Simple test endpoint
 router.get('/test', (req, res) => {
-  console.log('Auth test endpoint hit!');
   res.json({ message: 'Auth routes are working!' });
 });
 
-// Debug login endpoint
-router.post('/debug-login', async (req, res) => {
-  try {
-    console.log('=== DEBUG LOGIN START ===');
-    console.log('Request headers:', req.headers);
-    console.log('Request body:', req.body);
-    
-    const { email, password } = req.body;
-    console.log('Extracted email:', email);
-    console.log('Extracted password length:', password?.length);
-    
-    // Check if user exists
-    const user = await User.findOne({ email, isActive: true });
-    console.log('User found:', !!user);
-    
-    if (!user) {
-      console.log('Login failed: User not found or inactive');
-      return res.status(400).json({ message: '无效的邮箱或密码', reason: 'user_not_found' });
-    }
 
-    console.log('User details:', {
-      email: user.email,
-      name: user.name,
-      isActive: user.isActive,
-      passwordHash: user.password.substring(0, 20) + '...'
-    });
-
-    // Check password
-    const isMatch = await user.comparePassword(password);
-    console.log('Password match result:', isMatch);
-    
-    if (!isMatch) {
-      console.log('Login failed: Password mismatch');
-      return res.status(400).json({ message: '无效的邮箱或密码', reason: 'password_mismatch' });
-    }
-
-    console.log('Login successful!');
-    res.json({ message: '登录成功', debug: true });
-    
-  } catch (error) {
-    console.error('Debug login error:', error);
-    res.status(500).json({ message: '服务器错误', error: error.message });
-  }
-});
 
 // Register
 router.post('/register', async (req, res) => {
@@ -134,46 +90,21 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
   try {
-    console.log('=== LOGIN ATTEMPT STARTED ===');
-    console.log('Timestamp:', new Date().toISOString());
     const { email, password } = req.body;
-    console.log('Request body:', req.body);
-    console.log('Content-Type:', req.get('Content-Type'));
-    console.log('Email:', email);
-    console.log('Password length:', password?.length);
     
     // Check if user exists
-    console.log('Searching for user with email:', email, 'and isActive:', true);
     const user = await User.findOne({ email: email, isActive: true });
-    console.log('User found:', !!user);
     
     if (!user) {
-      console.log('Login failed: User not found or inactive');
-      // Try to find user regardless of active status for debugging
-      const anyUser = await User.findOne({ email });
-      console.log('User exists but inactive?', !!anyUser);
       return res.status(400).json({ message: '无效的邮箱或密码' });
     }
-
-    console.log('User details:', {
-      _id: user._id,
-      email: user.email,
-      name: user.name,
-      isActive: user.isActive,
-      passwordHash: user.password.substring(0, 20) + '...'
-    });
 
     // Check password
-    console.log('Comparing password...');
     const isMatch = await user.comparePassword(password);
-    console.log('Password match result:', isMatch);
     
     if (!isMatch) {
-      console.log('Login failed: Password mismatch');
       return res.status(400).json({ message: '无效的邮箱或密码' });
     }
-
-    console.log('Login successful for user:', email);
 
     // Generate tokens
     const accessToken = generateAccessToken({ userId: user._id, role: user.role });

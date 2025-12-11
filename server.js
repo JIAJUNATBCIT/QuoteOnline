@@ -41,15 +41,7 @@ app.use((req, res, next) => {
     userAgent: req.get('User-Agent')
   });
   
-  // 特殊调试登录请求
-  if (req.path === '/api/auth/login') {
-    console.log('🔍 LOGIN REQUEST DETECTED:', {
-      method: req.method,
-      url: req.url,
-      body: req.body,
-      headers: req.headers
-    });
-  }
+
   
   // 请求超时处理
   res.setTimeout(config.server.timeout, () => {
