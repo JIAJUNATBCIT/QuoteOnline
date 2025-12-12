@@ -7,7 +7,7 @@ import { PermissionService } from '../../services/permission.service';
 import { TokenService } from '../../services/token.service';
 import { getStatusDisplayName } from '../../utils/status.utils';
 import { FileUtils, TempFile } from '../../utils/file.utils';
-import { ConfigService } from '../../services/config.service';
+import { environment } from '../../../../environment';
 
 import { GroupService, Group } from '../../services/group.service';
 
@@ -62,7 +62,7 @@ export class QuoteDetailComponent implements OnInit {
     private tokenService: TokenService,
     private ngZone: NgZone,
     private groupService: GroupService,
-    private configService: ConfigService
+    
   ) { }
 
   ngOnInit() {
@@ -488,7 +488,7 @@ export class QuoteDetailComponent implements OnInit {
     
     // 配置请求
     xhr.timeout = 120000; // 2分钟超时（多文件需要更长时间）
-    const url = this.configService.buildApiUrl(`/quotes/${this.quote._id}`);
+    const url = `${environment.apiUrl}/quotes/${this.quote._id}`;
     xhr.open('PUT', url);
     
     // 添加认证头 - 使用TokenService获取正确的token

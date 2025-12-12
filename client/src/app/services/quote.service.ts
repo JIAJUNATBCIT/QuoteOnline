@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ConfigService } from './config.service';
+import { environment } from '../../../environment';
 
 
 export interface QuoteFile {
@@ -41,49 +41,48 @@ export interface Quote {
 })
 export class QuoteService {
   constructor(
-    private http: HttpClient,
-    private configService: ConfigService
+    private http: HttpClient
   ) { }
 
   getAllQuotes(): Observable<Quote[]> {
-    const url = this.configService.buildApiUrl('/quotes');
+    const url = `${environment.apiUrl}/quotes`;
     return this.http.get<Quote[]>(url);
   }
 
   getQuoteById(id: string): Observable<Quote> {
-    const url = this.configService.buildApiUrl(`/quotes/${id}`);
+    const url = `${environment.apiUrl}/quotes/${id}`;
     return this.http.get<Quote>(url);
   }
 
   getPublicQuote(id: string): Observable<any> {
-    const url = this.configService.buildApiUrl(`/quotes/public/${id}`);
+    const url = `${environment.apiUrl}/quotes/public/${id}`;
     return this.http.get<any>(url);
   }
 
   createQuote(quoteData: FormData): Observable<Quote> {
-    const url = this.configService.buildApiUrl('/quotes');
+    const url = `${environment.apiUrl}/quotes`;
     return this.http.post<Quote>(url, quoteData);
   }
 
   updateQuote(id: string, quoteData: FormData): Observable<Quote> {
-    const url = this.configService.buildApiUrl(`/quotes/${id}`);
+    const url = `${environment.apiUrl}/quotes/${id}`;
     return this.http.put<Quote>(url, quoteData);
   }
 
   assignQuote(id: string, quoterId: string): Observable<Quote> {
-    const url = this.configService.buildApiUrl(`/quotes/${id}/assign`);
+    const url = `${environment.apiUrl}/quotes/${id}/assign`;
     return this.http.patch<Quote>(url, { quoterId });
   }
 
   assignSupplier(id: string, supplierId: string): Observable<Quote> {
-    const url = this.configService.buildApiUrl(`/quotes/${id}/assign-supplier`);
+    const url = `${environment.apiUrl}/quotes/${id}/assign-supplier`;
     return this.http.patch<Quote>(url, { supplierId });
   }
 
 
 
   rejectQuote(id: string, rejectReason: string): Observable<Quote> {
-    const url = this.configService.buildApiUrl(`/quotes/${id}/reject`);
+    const url = `${environment.apiUrl}/quotes/${id}/reject`;
     return this.http.patch<Quote>(url, { rejectReason });
   }
 
@@ -91,42 +90,42 @@ export class QuoteService {
     const path = fileIndex !== undefined 
       ? `/quotes/${quoteId}/download/${fileType}-${fileIndex}`
       : `/quotes/${quoteId}/download/${fileType}`;
-    const url = this.configService.buildApiUrl(path);
+    const url = `${environment.apiUrl}${path}`;
     return this.http.get(url, {
       responseType: 'blob'
     });
   }
 
   downloadFilesBatch(quoteId: string, fileType: string): Observable<Blob> {
-    const url = this.configService.buildApiUrl(`/quotes/${quoteId}/download/${fileType}/batch`);
+    const url = `${environment.apiUrl}/quotes/${quoteId}/download/${fileType}/batch`;
     return this.http.get(url, {
       responseType: 'blob'
     });
   }
 
   deleteQuote(id: string): Observable<void> {
-    const url = this.configService.buildApiUrl(`/quotes/${id}`);
+    const url = `${environment.apiUrl}/quotes/${id}`;
     return this.http.delete<void>(url);
   }
 
   confirmSupplierQuote(id: string): Observable<Quote> {
-    const url = this.configService.buildApiUrl(`/quotes/${id}/confirm-supplier-quote`);
+    const url = `${environment.apiUrl}/quotes/${id}/confirm-supplier-quote`;
     return this.http.patch<Quote>(url, {});
   }
 
   confirmFinalQuote(id: string): Observable<Quote> {
-    const url = this.configService.buildApiUrl(`/quotes/${id}/confirm-final-quote`);
+    const url = `${environment.apiUrl}/quotes/${id}/confirm-final-quote`;
     return this.http.patch<Quote>(url, {});
   }
 
   // 群组分配相关方法
   assignGroupsToQuote(id: string, groupIds: string[]): Observable<Quote> {
-    const url = this.configService.buildApiUrl(`/quotes/${id}/assign-groups`);
+    const url = `${environment.apiUrl}/quotes/${id}/assign-groups`;
     return this.http.patch<Quote>(url, { groupIds });
   }
 
   removeGroupAssignment(id: string, groupId: string): Observable<Quote> {
-    const url = this.configService.buildApiUrl(`/quotes/${id}/groups/${groupId}`);
+    const url = `${environment.apiUrl}/quotes/${id}/groups/${groupId}`;
     return this.http.delete<Quote>(url);
   }
 }

@@ -5,7 +5,7 @@ import { tap, catchError } from 'rxjs/operators';
 
 import { User, AuthResponse } from '../utils/user.types';
 import { TokenService } from './token.service';
-import { ConfigService } from './config.service';
+import { environment } from '../../../environment';
 import { Router } from '@angular/router';
 
 @Injectable({
@@ -18,7 +18,6 @@ export class AuthService {
   constructor(
     private http: HttpClient,
     private tokenService: TokenService,
-    private configService: ConfigService,
     private router: Router
   ) {
     this.loadUserFromStorage();
@@ -40,7 +39,7 @@ export class AuthService {
   }
 
   login(email: string, password: string): Observable<AuthResponse> {
-    const url = this.configService.buildApiUrl('/auth/login');
+    const url = `${environment.apiUrl}/auth/login`;
     return this.http.post<AuthResponse>(url, { email, password })
       .pipe(
         tap(response => {
@@ -54,7 +53,7 @@ export class AuthService {
   }
 
   register(userData: any): Observable<AuthResponse> {
-    const url = this.configService.buildApiUrl('/auth/register');
+    const url = `${environment.apiUrl}/auth/register`;
     return this.http.post<AuthResponse>(url, userData)
       .pipe(
         tap(response => {
@@ -98,12 +97,12 @@ export class AuthService {
   }
 
   forgotPassword(email: string): Observable<any> {
-    const url = this.configService.buildApiUrl('/auth/forgot-password');
+    const url = `${environment.apiUrl}/auth/forgot-password`;
     return this.http.post(url, { email });
   }
 
   resetPassword(token: string, newPassword: string): Observable<any> {
-    const url = this.configService.buildApiUrl('/auth/reset-password');
+    const url = `${environment.apiUrl}/auth/reset-password`;
     return this.http.post(url, { token, newPassword });
   }
 }

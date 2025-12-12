@@ -2,7 +2,6 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
-import { ConfigService } from '../../services/config.service';
 
 @Component({
   selector: 'app-login',
@@ -19,12 +18,11 @@ export class LoginComponent implements OnInit {
     private formBuilder: FormBuilder,
     private route: ActivatedRoute,
     private router: Router,
-    private authService: AuthService,
-    private configService: ConfigService
+    private authService: AuthService
   ) {}
 
-  async ngOnInit() {
-    // 先初始化表单，避免模板报错
+  ngOnInit() {
+    // 初始化表单
     this.loginForm = this.formBuilder.group({
       email: ['', [Validators.required, Validators.email]],
       password: ['', Validators.required]
@@ -37,14 +35,6 @@ export class LoginComponent implements OnInit {
       console.log('Login component - current URL:', this.router.url);
       console.log('Login component - all queryParams:', params);
     });
-
-    // 然后异步加载配置
-    try {
-      await this.configService.loadConfig();
-      console.log('Login component - API URL:', this.configService.getApiUrl());
-    } catch (error) {
-      console.error('Login component - 配置加载失败:', error);
-    }
   }
 
   onSubmit() {
