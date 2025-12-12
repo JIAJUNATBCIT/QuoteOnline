@@ -13,8 +13,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,html,scss,json}\"",
     "e2e": "ng e2e",
     "analyze": "ng build --stats-json && npx webpack-bundle-analyzer dist/quote-online-client/stats.json",
-    "check-deps": "node scripts/check-unused-deps.js",
-    "perf-report": "node scripts/performance-report.js"
+    "check-deps": "node scripts/check-unused-deps.js"
   },
   "private": true,
   "dependencies": {
