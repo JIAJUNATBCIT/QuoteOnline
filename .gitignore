@@ -129,3 +129,5 @@ uploads/*
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+EnvTemplates.md
