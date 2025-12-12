@@ -29,7 +29,7 @@
               "fonts": true
             },
             "tsConfig": "tsconfig.app.json",
-            "assets": ["src/favicon.ico", "src/assets", "logo"],
+            "assets": ["src/favicon.ico", "src/assets", "src/logo"],
             "styles": [
               "src/styles.scss"
             ],
