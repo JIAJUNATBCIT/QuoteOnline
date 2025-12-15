@@ -3,7 +3,18 @@ const Mailgun = require('mailgun.js');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
-const { escapeHtml: escape, getCompatibleWrapper } = require('../utils/emailCompatibility');
+const config = require('../config/config');
+
+// HTML转义函数，防止XSS攻击
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 // 初始化Mailgun客户端
 const mailgun = new Mailgun(formData);
@@ -106,6 +117,15 @@ const sendPasswordReset = async (email, resetToken) => {
 
 // Send quote assignment notification to quoters
 const sendQuoterAssignmentNotification = async (quoterEmail, quote) => {
+  // 检查邮件通知开关
+  if (!config.email.enableQuoteEmailNotifications) {
+    logger.info('报价员分配通知邮件已禁用，跳过发送...', { 
+      quoteNumber: quote.quoteNumber,
+      quoterEmail 
+    });
+    return null;
+  }
+
   try {
     const startTime = Date.now();
     const client = createClient();
@@ -139,6 +159,15 @@ const sendQuoterAssignmentNotification = async (quoterEmail, quote) => {
 
 // 发送供应商确认报价邮件给报价员
 const sendSupplierQuotedNotification = async (quoterEmail, quote) => {
+  // 检查邮件通知开关
+  if (!config.email.enableQuoteEmailNotifications) {
+    logger.info('供应商确认报价邮件已禁用，跳过发送...', { 
+      quoteNumber: quote.quoteNumber,
+      quoterEmail 
+    });
+    return null;
+  }
+
   try {
     const startTime = Date.now();
     const client = createClient();
@@ -170,6 +199,15 @@ const sendSupplierQuotedNotification = async (quoterEmail, quote) => {
 
 // 发送最终报价确认邮件给客户
 const sendFinalQuoteNotification = async (customerEmail, quote) => {
+  // 检查邮件通知开关
+  if (!config.email.enableQuoteEmailNotifications) {
+    logger.info('最终报价确认邮件通知已禁用，跳过发送...', { 
+      quoteNumber: quote.quoteNumber,
+      customerEmail 
+    });
+    return null;
+  }
+
   try {
     const startTime = Date.now();
     const client = createClient();
@@ -384,21 +422,21 @@ const EmailTemplates = {
         <div class="info-box">
           <div class="info-row">
             <span class="info-label">询价号:</span>
-            <span class="info-value quote-number">${escape(quote.quoteNumber)}</span>
+            <span class="info-value quote-number">${escapeHtml(quote.quoteNumber)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">标题:</span>
-            <span class="info-value">${escape(quote.title)}</span>
+            <span class="info-value">${escapeHtml(quote.title)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">描述:</span>
-            <span class="info-value">${escape(quote.description) || '无'}</span>
+            <span class="info-value">${escapeHtml(quote.description) || '无'}</span>
           </div>
 
           <div class="info-row">
             <span class="info-label">询价文件:</span>
             <span class="info-value">${(quote.customerFiles && quote.customerFiles.length > 0) 
-              ? quote.customerFiles.map(file => escape(file.originalName)).join(', ')
+              ? quote.customerFiles.map(file => escapeHtml(file.originalName)).join(', ')
               : '无'}</span>
           </div>
           <div class="info-row">
@@ -671,26 +709,26 @@ const EmailTemplates = {
       
       <div class="content">
         <p>您好，</p>
-        <p>供应商 <strong>${quote.supplier ? escape(quote.supplier.name) : ''}</strong> 已经确认报价，请查看并上传最终报价文件。</p>
+        <p>供应商 <strong>${quote.supplier ? escapeHtml(quote.supplier.name) : ''}</strong> 已经确认报价，请查看并上传最终报价文件。</p>
         
         <div class="info-box">
           <h3>询价单信息</h3>
           <div class="info-row">
             <span class="info-label">询价号:</span>
-            <span class="info-value quote-number">${escape(quote.quoteNumber)}</span>
+            <span class="info-value quote-number">${escapeHtml(quote.quoteNumber)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">标题:</span>
-            <span class="info-value">${escape(quote.title)}</span>
+            <span class="info-value">${escapeHtml(quote.title)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">供应商:</span>
-            <span class="info-value">${quote.supplier ? escape(quote.supplier.name) : ''} (${quote.supplier ? escape(quote.supplier.email) : ''})</span>
+            <span class="info-value">${quote.supplier ? escapeHtml(quote.supplier.name) : ''} (${quote.supplier ? escapeHtml(quote.supplier.email) : ''})</span>
           </div>
           <div class="info-row">
             <span class="info-label">报价文件:</span>
             <span class="info-value">${quote.supplierFiles && quote.supplierFiles.length > 0 
-              ? quote.supplierFiles.map(file => escape(file.originalName)).join(', ')
+              ? quote.supplierFiles.map(file => escapeHtml(file.originalName)).join(', ')
               : '无'}</span>
           </div>
         </div>
@@ -822,30 +860,30 @@ const EmailTemplates = {
       
       <div class="content">
         <p>尊敬的客户，</p>
-        <p>您的询价单 <strong>${escape(quote.quoteNumber)}</strong> 的最终报价已经确认完成。</p>
+        <p>您的询价单 <strong>${escapeHtml(quote.quoteNumber)}</strong> 的最终报价已经确认完成。</p>
         
         <div class="info-box">
           <h3>询价单信息</h3>
           <div class="info-row">
             <span class="info-label">询价号:</span>
-            <span class="info-value quote-number">${escape(quote.quoteNumber)}</span>
+            <span class="info-value quote-number">${escapeHtml(quote.quoteNumber)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">标题:</span>
-            <span class="info-value">${escape(quote.title)}</span>
+            <span class="info-value">${escapeHtml(quote.title)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">描述:</span>
-            <span class="info-value">${escape(quote.description || '')}</span>
+            <span class="info-value">${escapeHtml(quote.description || '')}</span>
           </div>
           <div class="info-row">
             <span class="info-label">报价员:</span>
-            <span class="info-value">${quote.quoter && quote.quoter.name ? escape(quote.quoter.name) : '未分配'}${quote.quoter && quote.quoter.email ? ` (${escape(quote.quoter.email)})` : ''}</span>
+            <span class="info-value">${quote.quoter && quote.quoter.name ? escapeHtml(quote.quoter.name) : '未分配'}${quote.quoter && quote.quoter.email ? ` (${escapeHtml(quote.quoter.email)})` : ''}</span>
           </div>
           <div class="info-row">
             <span class="info-label">最终报价文件:</span>
             <span class="info-value">${quote.quoterFiles && quote.quoterFiles.length > 0 
-              ? quote.quoterFiles.map(file => escape(file.originalName)).join(', ')
+              ? quote.quoterFiles.map(file => escapeHtml(file.originalName)).join(', ')
               : '无'}</span>
           </div>
         </div>
@@ -981,20 +1019,20 @@ const EmailTemplates = {
           <h3>询价单信息</h3>
           <div class="info-row">
             <span class="info-label">询价号:</span>
-            <span class="info-value quote-number">${escape(quote.quoteNumber)}</span>
+            <span class="info-value quote-number">${escapeHtml(quote.quoteNumber)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">标题:</span>
-            <span class="info-value">${escape(quote.title)}</span>
+            <span class="info-value">${escapeHtml(quote.title)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">描述:</span>
-            <span class="info-value">${escape(quote.description || '无')}</span>
+            <span class="info-value">${escapeHtml(quote.description || '无')}</span>
           </div>
           <div class="info-row">
             <span class="info-label">询价文件:</span>
             <span class="info-value">${(quote.customerFiles && quote.customerFiles.length > 0) 
-              ? quote.customerFiles.map(file => escape(file.originalName)).join(', ')
+              ? quote.customerFiles.map(file => escapeHtml(file.originalName)).join(', ')
               : '无'}</span>
           </div>
           <div class="info-row">
@@ -1138,31 +1176,31 @@ const EmailTemplates = {
       
       <div class="content">
         <p>尊敬的客户，</p>
-        <p>很遗憾地通知您，您的询价单 <strong>${escape(quote.quoteNumber)}</strong> 经过评估后决定不予报价。</p>
+        <p>很遗憾地通知您，您的询价单 <strong>${escapeHtml(quote.quoteNumber)}</strong> 经过评估后决定不予报价。</p>
         
         <div class="info-box">
           <h3>询价单信息</h3>
           <div class="info-row">
             <span class="info-label">询价号:</span>
-            <span class="info-value quote-number">${escape(quote.quoteNumber)}</span>
+            <span class="info-value quote-number">${escapeHtml(quote.quoteNumber)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">标题:</span>
-            <span class="info-value">${escape(quote.title)}</span>
+            <span class="info-value">${escapeHtml(quote.title)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">描述:</span>
-            <span class="info-value">${escape(quote.description || '')}</span>
+            <span class="info-value">${escapeHtml(quote.description || '')}</span>
           </div>
           <div class="info-row">
             <span class="info-label">处理人员:</span>
-            <span class="info-value">${quote.quoter && quote.quoter.name ? escape(quote.quoter.name) : '系统'}</span>
+            <span class="info-value">${quote.quoter && quote.quoter.name ? escapeHtml(quote.quoter.name) : '系统'}</span>
           </div>
         </div>
         
         <div class="reject-reason">
           <h4>📝 不予报价理由：</h4>
-          <p>${escape(quote.rejectReason || '暂无具体说明')}</p>
+          <p>${escapeHtml(quote.rejectReason || '暂无具体说明')}</p>
         </div>
         
         <p>如果您对此决定有任何疑问，或者需要进一步的说明，请随时联系我们。</p>

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const GroupSchema = new mongoose.Schema({
+const SupplierGroupSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
@@ -32,7 +32,4 @@ const GroupSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// 创建索引 (name字段已有unique: true，不需要重复创建索引)
-GroupSchema.index({ isActive: 1 });
-
-module.exports = mongoose.model('Group', GroupSchema);
+module.exports = mongoose.model('SupplierGroup', SupplierGroupSchema);

@@ -3,10 +3,29 @@ const User = require('../models/User');
 const { auth, authorize } = require('../middleware/auth');
 const router = express.Router();
 
-// Get all users (admin only)
-router.get('/', auth, authorize('admin'), async (req, res) => {
+// Get all users (admin only) or get customers for customer group assignment (quoter or admin)
+router.get('/', auth, async (req, res) => {
   try {
-    const users = await User.find().select('-password');
+    const { forCustomerGroup } = req.query;
+    
+    // 检查权限
+    if (!['quoter', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ message: '权限不足' });
+    }
+    
+    // 如果是客户群组分配场景，只返回客户用户
+    if (forCustomerGroup === 'true') {
+      const users = await User.find({ role: 'customer', isActive: true }).select('-password').sort({ name: 1 });
+      return res.json(users);
+    }
+    
+    // 其他情况（用户管理），只有管理员可以获取所有用户
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: '权限不足' });
+    }
+    
+    // 管理员获取所有用户
+    const users = await User.find().select('-password').sort({ name: 1 });
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: '服务器错误', error: error.message });

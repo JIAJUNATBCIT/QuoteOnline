@@ -150,8 +150,8 @@
           <div class="input-group">
             <select class="form-select" [(ngModel)]="selectedGroupId">
               <option value="">请选择供应商</option>
-              <option *ngFor="let group of groups" [value]="group._id">
-                {{ group.name }} ({{ group.users ? group.users.length : 0 }}名成员)
+              <option *ngFor="let supplierGroup of supplierGroups" [value]="supplierGroup._id">
+                {{ supplierGroup.name }} ({{ supplierGroup.users ? supplierGroup.users.length : 0 }}名成员)
               </option>
             </select>
             <button class="btn btn-primary" (click)="assignSingleGroup()" [disabled]="!selectedGroupId || assigning">
@@ -365,25 +365,25 @@
     <div class="modal-body">
       <div class="mb-3">
         <label class="form-label">选择要分配的供应商:</label>
-        <div class="groups-list">
-          <div class="form-check mb-2" *ngFor="let group of groups">
+        <div class="supplier-groups-list">
+          <div class="form-check mb-2" *ngFor="let supplierGroup of supplierGroups">
             <input class="form-check-input" type="checkbox" 
-                   [id]="'group-' + group._id"
-                   [value]="group._id"
-                   [checked]="selectedGroupIds.includes(group._id)"
-                   (change)="onGroupSelectionChange(group._id, $event)">
-            <label class="form-check-label" [for]="'group-' + group._id">
+                   [id]="'supplierGroup-' + supplierGroup._id"
+                   [value]="supplierGroup._id"
+                   [checked]="selectedGroupIds.includes(supplierGroup._id)"
+                   (change)="onGroupSelectionChange(supplierGroup._id, $event)">
+            <label class="form-check-label" [for]="'supplierGroup-' + supplierGroup._id">
               <span class="badge me-2" 
-                    [style.backgroundColor]="group.color + '20'"
-                    [style.borderColor]="group.color"
-                    [style.color]="group.color"
+                    [style.backgroundColor]="supplierGroup.color + '20'"
+                    [style.borderColor]="supplierGroup.color"
+                    [style.color]="supplierGroup.color"
                     style="border: 1px solid;">
                 <i class="bi bi-tags-fill"></i>
               </span>
-              <strong>{{ group.name }}</strong>
-              <div class="text-muted small" *ngIf="group.description">{{ group.description }}</div>
-              <div class="text-muted small" *ngIf="group.users && group.users.length > 0">
-                <i class="bi bi-people-fill"></i> {{ group.users.length }} 名成员
+              <strong>{{ supplierGroup.name }}</strong>
+              <div class="text-muted small" *ngIf="supplierGroup.description">{{ supplierGroup.description }}</div>
+              <div class="text-muted small" *ngIf="supplierGroup.users && supplierGroup.users.length > 0">
+                <i class="bi bi-people-fill"></i> {{ supplierGroup.users.length }} 名成员
               </div>
             </label>
           </div>

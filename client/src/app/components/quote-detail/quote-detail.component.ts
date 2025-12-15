@@ -9,7 +9,7 @@ import { getStatusDisplayName } from '../../utils/status.utils';
 import { FileUtils, TempFile } from '../../utils/file.utils';
 import { environment } from '../../../../environment';
 
-import { GroupService, Group } from '../../services/group.service';
+import { SupplierGroupService, SupplierGroup } from '../../services/supplier-group.service';
 
 @Component({
   selector: 'app-quote-detail',
@@ -30,7 +30,7 @@ export class QuoteDetailComponent implements OnInit {
   error = '';
   quoters: any[] = [];
   suppliers: any[] = [];
-  groups: Group[] = [];
+  supplierGroups: SupplierGroup[] = [];
   editMode = false;
   quoteForm: any = {};
   uploading = false;
@@ -61,7 +61,7 @@ export class QuoteDetailComponent implements OnInit {
     private permissionService: PermissionService,
     private tokenService: TokenService,
     private ngZone: NgZone,
-    private groupService: GroupService,
+    private supplierGroupService: SupplierGroupService,
     
   ) { }
 
@@ -74,7 +74,7 @@ export class QuoteDetailComponent implements OnInit {
       }
       if (this.authService.hasRole('quoter') || this.authService.hasRole('admin')) {
         this.loadSuppliers();
-        this.loadGroups();
+        this.loadSupplierGroups();
       }
     }
   }
@@ -88,7 +88,8 @@ export class QuoteDetailComponent implements OnInit {
         this.loading = false;
 
       },
-      error: () => {
+      error: (error) => {
+        console.error('加载询价单详细错误:', error);
         this.error = '加载询价单失败';
         this.loading = false;
       }
@@ -117,10 +118,10 @@ export class QuoteDetailComponent implements OnInit {
     });
   }
 
-  loadGroups() {
-    this.groupService.getAllGroups().subscribe({
-      next: (groups) => {
-        this.groups = groups.filter(group => group.isActive);
+  loadSupplierGroups() {
+    this.supplierGroupService.getAllSupplierGroups().subscribe({
+      next: (supplierGroups) => {
+        this.supplierGroups = supplierGroups.filter(supplierGroup => supplierGroup.isActive);
       },
       error: (error) => {
         console.error('加载群组列表失败:', error);

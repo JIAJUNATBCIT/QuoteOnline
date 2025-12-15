@@ -5,14 +5,14 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 
 // 导入组件
-import { GroupManagementComponent } from '../components/group-management/group-management.component';
+import { SupplierGroupManagementComponent } from '../components/supplier-group-management/supplier-group-management.component';
 import { AuthGuard } from '../guards/auth.guard';
 import { RoleGuard } from '../guards/role.guard';
 
 const routes: Routes = [
   {
     path: '',
-    component: GroupManagementComponent,
+    component: SupplierGroupManagementComponent,
     canActivate: [AuthGuard, RoleGuard],
     data: { roles: ['admin', 'quoter'] }
   }
@@ -20,7 +20,7 @@ const routes: Routes = [
 
 @NgModule({
   declarations: [
-    GroupManagementComponent
+    SupplierGroupManagementComponent
   ],
   imports: [
     CommonModule,
@@ -30,4 +30,4 @@ const routes: Routes = [
     RouterModule.forChild(routes)
   ]
 })
-export class GroupsModule { }
+export class SupplierGroupsModule { }

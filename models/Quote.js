@@ -58,7 +58,11 @@ const QuoteSchema = new mongoose.Schema({
   },
   assignedGroups: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Group'
+    ref: 'SupplierGroup'
+  }],
+  customerGroups: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CustomerGroup'
   }],
   status: {
     type: String,

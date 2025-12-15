@@ -33,8 +33,12 @@ const routes: Routes = [
     loadChildren: () => import('./admin/admin.module').then(m => m.AdminModule)
   },
   {
-    path: 'groups',
-    loadChildren: () => import('./groups/groups.module').then(m => m.GroupsModule)
+    path: 'supplier-groups',
+    loadChildren: () => import('./supplier-groups/supplier-groups.module').then(m => m.SupplierGroupsModule)
+  },
+  {
+    path: 'customer-groups',
+    loadChildren: () => import('./customer-groups/customer-groups.module').then(m => m.CustomerGroupsModule)
   },
   {
     path: 'profile',

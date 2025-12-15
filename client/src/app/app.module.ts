@@ -19,6 +19,8 @@ import { AuthInterceptor } from './interceptors/auth.interceptor';
 import { NavbarComponent } from './components/navbar/navbar.component';
 import { FilterPipe } from './pipes/filter.pipe';
 import { DevToolsComponent } from './components/dev-tools/dev-tools.component';
+import { CustomerGroupsModule } from './customer-groups/customer-groups.module';
+import { SupplierGroupsModule } from './supplier-groups/supplier-groups.module';
 
 
 
@@ -41,7 +43,9 @@ import { DevToolsComponent } from './components/dev-tools/dev-tools.component';
     ReactiveFormsModule,
     FormsModule,
     CommonModule,
-    NgbModule
+    NgbModule,
+    CustomerGroupsModule,
+    SupplierGroupsModule
   ],
   providers: [
     {

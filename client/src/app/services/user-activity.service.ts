@@ -41,7 +41,7 @@ export class UserActivityService {
 
     // 定期检查用户活动状态
     timer(0, this.CHECK_INTERVAL).pipe(
-      switchMap(() => this.checkActivity())
+      switchMap(async () => this.checkActivity())
     ).subscribe();
   }
 

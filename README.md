@@ -28,7 +28,7 @@
 - MongoDB + Mongoose
 - JWT认证
 - Multer文件上传
-- Nodemailer邮件服务
+- Mailgun邮件服务
 
 ### 前端
 - Angular 16

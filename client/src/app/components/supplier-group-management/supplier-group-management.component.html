@@ -1,8 +1,8 @@
-<div class="group-management">
+<div class="supplier-group-management">
   <div class="header d-flex justify-content-between align-items-center mb-4">
-    <h2 class="mb-0">群组管理</h2>
+    <h2 class="mb-0">供应商群组管理</h2>
     <button class="btn btn-primary" (click)="openCreateModal()" *ngIf="authService.hasRole(['admin', 'quoter'])">
-      <i class="bi bi-plus-circle me-2"></i> 创建群组
+      <i class="bi bi-plus-circle me-2"></i> 创建供应商群组
     </button>
   </div>
 
@@ -20,41 +20,41 @@
     {{ error }}
   </div>
 
-  <!-- 群组列表 -->
-  <div *ngIf="!loading" class="groups-container">
-    <div class="group-card" *ngFor="let group of groups">
-      <div class="group-header">
-        <div class="group-info">
-          <h3>{{ group.name }}</h3>
-          <span class="status-badge" [class]="group.isActive ? 'active' : 'inactive'">
-            {{ group.isActive ? '启用' : '禁用' }}
+  <!-- 供应商群组列表 -->
+  <div *ngIf="!loading" class="supplier-groups-container">
+    <div class="supplier-group-card" *ngFor="let supplierGroup of supplierGroups">
+      <div class="supplier-group-header">
+        <div class="supplier-group-info">
+          <h3>{{ supplierGroup.name }}</h3>
+          <span class="status-badge" [class]="supplierGroup.isActive ? 'active' : 'inactive'">
+            {{ supplierGroup.isActive ? '启用' : '禁用' }}
           </span>
         </div>
-        <div class="group-actions" *ngIf="authService.hasRole(['admin', 'quoter'])">
-          <button class="btn btn-sm btn-outline-primary" (click)="openEditModal(group)" title="编辑群组">
+        <div class="supplier-group-actions" *ngIf="authService.hasRole(['admin', 'quoter'])">
+          <button class="btn btn-sm btn-outline-primary" (click)="openEditModal(supplierGroup)" title="编辑供应商群组">
             <i class="bi bi-pencil"></i>
           </button>
-          <button class="btn btn-sm btn-outline-info" (click)="openAssignModal(group)" title="分配成员">
+          <button class="btn btn-sm btn-outline-info" (click)="openAssignModal(supplierGroup)" title="分配成员">
             <i class="bi bi-people"></i>
           </button>
-          <button class="btn btn-sm btn-outline-danger" (click)="deleteGroup(group)" title="删除群组">
+          <button class="btn btn-sm btn-outline-danger" (click)="deleteSupplierGroup(supplierGroup)" title="删除供应商群组">
             <i class="bi bi-trash"></i>
           </button>
         </div>
       </div>
       
-      <div class="group-body">
-        <p *ngIf="group.description" class="description">{{ group.description }}</p>
+      <div class="supplier-group-body">
+        <p *ngIf="supplierGroup.description" class="description">{{ supplierGroup.description }}</p>
         
-        <div class="group-meta">
-          <small><i class="bi bi-person"></i> 创建者: {{ group.createdBy.name }}</small>
-          <small><i class="bi bi-calendar"></i> {{ group.createdAt | date:'yyyy-MM-dd HH:mm' }}</small>
+        <div class="supplier-group-meta">
+          <small><i class="bi bi-person"></i> 创建者: {{ supplierGroup.createdBy.name }}</small>
+          <small><i class="bi bi-calendar"></i> {{ supplierGroup.createdAt | date:'yyyy-MM-dd HH:mm' }}</small>
         </div>
 
-        <div class="users-section" *ngIf="group.users && group.users.length > 0">
-          <h4><i class="bi bi-people"></i> 群组成员 ({{ group.users.length }})</h4>
+        <div class="users-section" *ngIf="supplierGroup.users && supplierGroup.users.length > 0">
+          <h4><i class="bi bi-people"></i> 群组成员 ({{ supplierGroup.users.length }})</h4>
           <div class="users-grid">
-            <div class="user-item" *ngFor="let user of group.users">
+            <div class="user-item" *ngFor="let user of supplierGroup.users">
               <i class="bi bi-person-circle"></i>
               <div class="user-info">
                 <span class="user-name">{{ user.name }}</span>
@@ -69,42 +69,42 @@
   </div>
 
   <!-- 空状态 -->
-  <div *ngIf="!loading && groups.length === 0" class="text-center py-5">
+  <div *ngIf="!loading && supplierGroups.length === 0" class="text-center py-5">
     <i class="bi bi-people fs-1 text-muted"></i>
-    <h3 class="mt-3">暂无群组</h3>
+    <h3 class="mt-3">暂无供应商群组</h3>
     <p *ngIf="authService.hasRole(['admin', 'quoter'])" class="text-muted">
-      点击上方按钮创建第一个群组
+      点击上方按钮创建第一个供应商群组
     </p>
   </div>
 </div>
 
-<!-- 创建群组模态框 -->
+<!-- 创建供应商群组模态框 -->
 <div class="modal fade" [class.show]="showCreateModal" [style.display]="showCreateModal ? 'block' : 'none'" 
      [class.d-block]="showCreateModal" tabindex="-1" (click)="closeCreateModal()">
   <div class="modal-dialog modal-dialog-centered" (click)="$event.stopPropagation()">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
-          <i class="bi bi-plus-circle-fill text-success me-2"></i>创建新群组
+          <i class="bi bi-plus-circle-fill text-success me-2"></i>创建新供应商群组
         </h5>
         <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
       </div>
       <div class="modal-body">
-        <form (ngSubmit)="createGroup()">
+        <form (ngSubmit)="createSupplierGroup()">
           <div class="mb-3">
             <label for="groupName" class="form-label">
-              群组名称 <span class="text-danger">*</span>
+              供应商群组名称 <span class="text-danger">*</span>
             </label>
             <input type="text" class="form-control" id="groupName" 
                    [(ngModel)]="groupForm.name" name="name" required 
-                   placeholder="请输入群组名称，例如：电子元件供应商">
+                   placeholder="请输入供应商群组名称，例如：电子元件供应商">
           </div>
           
           <div class="mb-3">
-            <label for="groupDescription" class="form-label">群组描述</label>
+            <label for="groupDescription" class="form-label">供应商群组描述</label>
             <textarea class="form-control" id="groupDescription" rows="3"
                       [(ngModel)]="groupForm.description" name="description"
-                      placeholder="请输入群组描述（可选）"></textarea>
+                      placeholder="请输入供应商群组描述（可选）"></textarea>
           </div>
           
           <div class="modal-footer">
@@ -112,7 +112,7 @@
               <i class="bi bi-x-circle me-2"></i>取消
             </button>
             <button type="submit" class="btn btn-success">
-              <i class="bi bi-plus-circle me-2"></i>创建群组
+              <i class="bi bi-plus-circle me-2"></i>创建供应商群组
             </button>
           </div>
         </form>
@@ -121,21 +121,21 @@
   </div>
 </div>
 
-<!-- 编辑群组模态框 -->
+<!-- 编辑供应商群组模态框 -->
 <div class="modal fade" [class.show]="showEditModal" [style.display]="showEditModal ? 'block' : 'none'" 
      [class.d-block]="showEditModal" tabindex="-1" (click)="closeEditModal()">
   <div class="modal-dialog modal-dialog-centered" (click)="$event.stopPropagation()">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
-          <i class="bi bi-pencil-square text-primary me-2"></i>编辑群组
+          <i class="bi bi-pencil-square text-primary me-2"></i>编辑供应商群组
         </h5>
         <button type="button" class="btn-close" (click)="closeEditModal()"></button>
       </div>
       <div class="modal-body">
         <div class="alert alert-info">
           <div class="d-flex justify-content-between">
-            <span class="fw-bold">当前群组:</span>
+            <span class="fw-bold">当前供应商群组:</span>
             <span>{{ editForm.name }}</span>
           </div>
           <div class="d-flex justify-content-between mt-1">
@@ -144,21 +144,21 @@
           </div>
         </div>
         
-        <form (ngSubmit)="updateGroup()">
+        <form (ngSubmit)="updateSupplierGroup()">
           <div class="mb-3">
             <label for="editGroupName" class="form-label">
-              群组名称 <span class="text-danger">*</span>
+              供应商群组名称 <span class="text-danger">*</span>
             </label>
             <input type="text" class="form-control" id="editGroupName" 
                    [(ngModel)]="editForm.name" name="name" required 
-                   placeholder="请输入群组名称">
+                   placeholder="请输入供应商群组名称">
           </div>
           
           <div class="mb-3">
-            <label for="editGroupDescription" class="form-label">群组描述</label>
+            <label for="editGroupDescription" class="form-label">供应商群组描述</label>
             <textarea class="form-control" id="editGroupDescription" rows="3"
                       [(ngModel)]="editForm.description" name="description"
-                      placeholder="请输入群组描述（可选）"></textarea>
+                      placeholder="请输入供应商群组描述（可选）"></textarea>
           </div>
           
           <div class="mb-3">
@@ -166,8 +166,8 @@
               <input class="form-check-input" type="checkbox" id="editGroupActive"
                      [(ngModel)]="editForm.isActive" name="isActive">
               <label class="form-check-label" for="editGroupActive">
-                <i class="bi bi-power me-2"></i>启用群组
-                <div class="form-text">禁用后，该群组将无法被分配新的询价单</div>
+                <i class="bi bi-power me-2"></i>启用供应商群组
+                <div class="form-text">禁用后，该供应商群组将无法被分配新的询价单</div>
               </label>
             </div>
           </div>
@@ -193,7 +193,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
-          <i class="bi bi-people-fill text-info me-2"></i>分配供应商到群组
+          <i class="bi bi-people-fill text-info me-2"></i>分配供应商到供应商群组
         </h5>
         <button type="button" class="btn-close" (click)="closeAssignModal()"></button>
       </div>
@@ -256,7 +256,7 @@
           <button type="button" class="btn btn-secondary" (click)="closeAssignModal()">
             <i class="bi bi-x-circle me-2"></i>取消
           </button>
-          <button type="button" class="btn btn-info" (click)="assignUsersToGroup()">
+          <button type="button" class="btn btn-info" (click)="assignUsersToSupplierGroup()">
             <i class="bi bi-people-plus me-2"></i>确认更新成员
             <span *ngIf="selectedSuppliers.length > 0">({{ selectedSuppliers.length }})</span>
           </button>

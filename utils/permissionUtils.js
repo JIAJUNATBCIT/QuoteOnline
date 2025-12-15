@@ -3,6 +3,8 @@
  * 统一前后端权限检查逻辑
  */
 
+const User = require('../models/User');
+
 class PermissionUtils {
   
   /**
@@ -40,15 +42,33 @@ class PermissionUtils {
    * 检查用户是否可以查看询价单
    * @param {Object} quote 询价单对象
    * @param {Object} user 用户对象
+   * @param {Array} userCustomerGroupIds 用户当前客户群组ID数组
    * @returns {boolean} 是否可以查看
    */
-  static canViewQuote(quote, user) {
+  static canViewQuote(quote, user, userCustomerGroupIds = null) {
     if (!user) return false;
     
     switch (user.role) {
       case 'customer':
-        return quote.customer._id?.toString() === user.userId?.toString() || 
-               quote.customer?.toString() === user.userId?.toString();
+        // 获取用户的客户群组IDs
+        if (!userCustomerGroupIds) {
+          userCustomerGroupIds = user.customerGroups ? user.customerGroups.map(id => id.toString()) : [];
+        }
+        
+        // 检查是否是询价单的创建者
+        if (quote.customer._id?.toString() === user.userId?.toString() || 
+            quote.customer?.toString() === user.userId?.toString()) {
+          return true;
+        }
+        
+        // 检查询价单的customerGroups是否与用户的customerGroups有交集
+        if (quote.customerGroups && quote.customerGroups.length > 0 && userCustomerGroupIds.length > 0) {
+          return quote.customerGroups.some(groupId => {
+            return userCustomerGroupIds.includes(groupId.toString());
+          });
+        }
+        
+        return false;
       case 'supplier':
         return quote.supplier?._id?.toString() === user.userId?.toString() || 
                quote.supplier?.toString() === user.userId?.toString() || 
@@ -59,6 +79,51 @@ class PermissionUtils {
       default:
         return false;
     }
+  }
+
+  /**
+   * 检查客户是否可以查看询价单
+   * 客户可以查看：自己创建的询价单或与自己customerGroups有交集的询价单
+   * @param {Object} quote 询价单对象
+   * @param {Object} user 用户对象
+   * @returns {boolean} 是否可以查看
+   */
+  static canCustomerViewQuote(quote, user) {
+    if (!user || user.role !== 'customer') return false;
+    
+    // 获取用户ID（兼容不同的用户对象格式）
+    const userId = user._id?.toString() || user.userId?.toString();
+    
+    // 检查是否是询价单的创建者
+    // 处理quote.customer的不同格式：可能是对象（包含_id）或字符串ID
+    let customerId;
+    if (quote.customer && typeof quote.customer === 'object' && quote.customer !== null) {
+      customerId = quote.customer._id ? quote.customer._id.toString() : quote.customer.toString();
+    } else {
+      customerId = quote.customer?.toString();
+    }
+    
+    if (customerId === userId) {
+      return true;
+    }
+    
+    // 检查询价单的customerGroups是否与用户的customerGroups有交集
+    const userCustomerGroupIds = user.customerGroups ? user.customerGroups.map(id => id.toString()) : [];
+    
+    if (quote.customerGroups && quote.customerGroups.length > 0 && userCustomerGroupIds.length > 0) {
+      return quote.customerGroups.some(group => {
+        // 处理不同的group格式：可能是对象（包含_id）或字符串ID
+        let groupId;
+        if (typeof group === 'object' && group !== null) {
+          groupId = group._id ? group._id.toString() : group.toString();
+        } else {
+          groupId = group.toString();
+        }
+        return userCustomerGroupIds.includes(groupId);
+      });
+    }
+    
+    return false;
   }
 
   /**
@@ -164,6 +229,27 @@ class PermissionUtils {
       default:
         return false;
     }
+  }
+
+  /**
+   * 检查用户是否具有指定角色（中间件函数）
+   * @param {string|Array} roles 允许的角色或角色数组
+   * @returns {Function} Express 中间件函数
+   */
+  static hasRole(roles) {
+    return (req, res, next) => {
+      if (!req.user) {
+        return res.status(401).json({ message: '未授权访问' });
+      }
+
+      const allowedRoles = Array.isArray(roles) ? roles : [roles];
+      
+      if (allowedRoles.includes(req.user.role)) {
+        next();
+      } else {
+        res.status(403).json({ message: '权限不足' });
+      }
+    };
   }
 }
 

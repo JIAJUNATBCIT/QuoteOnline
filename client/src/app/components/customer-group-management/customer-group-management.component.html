@@ -1,0 +1,231 @@
+<div class="customer-group-management">
+  <div class="header d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">客户群组管理</h2>
+    <button class="btn btn-primary" (click)="openCreateGroupModal()" *ngIf="isAdminOrQuoter()">
+      <i class="bi bi-plus-circle me-2"></i> 创建客户群组
+    </button>
+  </div>
+
+  <!-- 加载状态 -->
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">加载中...</span>
+    </div>
+    <p class="mt-2">加载中...</p>
+  </div>
+
+  <!-- 错误信息 -->
+  <div *ngIf="error" class="alert alert-danger" role="alert">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    {{ error }}
+  </div>
+
+  <!-- 客户群组列表 -->
+  <div *ngIf="!loading" class="customer-groups-container">
+    <div class="customer-group-card" *ngFor="let group of customerGroups">
+      <div class="customer-group-header">
+        <div class="customer-group-info">
+          <h3>{{ group.name }}</h3>
+          <span class="status-badge" [class]="group.isActive ? 'active' : 'inactive'">
+            {{ group.isActive ? '启用' : '禁用' }}
+          </span>
+        </div>
+        <div class="customer-group-actions" *ngIf="isAdminOrQuoter()">
+          <button class="btn btn-sm btn-outline-primary" (click)="openEditGroupModal(group)" title="编辑客户群组">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-info" (click)="openAssignCustomersModal(group)" title="分配客户">
+            <i class="bi bi-people"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger" (click)="deleteGroup(group)" title="删除客户群组">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="customer-group-body">
+        <p *ngIf="group.description" class="description">{{ group.description }}</p>
+        
+        <div class="customer-group-meta">
+          <small><i class="bi bi-person"></i> 创建者: {{ getCreatorName(group) }}</small>
+          <small><i class="bi bi-calendar"></i> {{ group.createdAt | date:'yyyy-MM-dd HH:mm' }}</small>
+        </div>
+
+        <div class="users-section" *ngIf="group.customers && group.customers.length > 0">
+          <h4><i class="bi bi-people"></i> 群组成员 ({{ group.customers.length }})</h4>
+          <div class="users-grid">
+            <div class="user-item" *ngFor="let customer of group.customers">
+              <i class="bi bi-person-circle"></i>
+              <div class="user-info">
+                <span class="user-name">{{ customer.name }}</span>
+                <span class="user-email">{{ customer.email }}</span>
+                <span *ngIf="customer.company" class="user-company">{{ customer.company }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="!group.customers || group.customers.length === 0" class="empty-users">
+          <i class="bi bi-people fs-3"></i>
+          <p>暂无群组成员</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空状态 -->
+  <div *ngIf="!loading && customerGroups.length === 0" class="text-center py-5">
+    <i class="bi bi-people fs-1 text-muted"></i>
+    <h3 class="mt-3">暂无客户群组</h3>
+    <p *ngIf="isAdminOrQuoter()" class="text-muted">
+      点击上方按钮创建第一个客户群组
+    </p>
+  </div>
+</div>
+
+<!-- 模态框背景遮罩 -->
+<div class="modal-backdrop fade" [class.show]="showCreateModal || showAssignModal" 
+     [style.display]="(showCreateModal || showAssignModal) ? 'block' : 'none'"></div>
+
+<!-- 创建客户群组模态框 -->
+<div class="modal fade" [class.show]="showCreateModal" [style.display]="showCreateModal ? 'block' : 'none'" 
+     [class.d-block]="showCreateModal" tabindex="-1" (click)="closeCreateModal()">
+  <div class="modal-dialog modal-dialog-centered" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-plus-circle-fill text-success me-2"></i>{{ editingGroup ? '编辑客户群组' : '创建新客户群组' }}
+        </h5>
+        <button type="button" class="btn-close" (click)="closeCreateModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form (ngSubmit)="saveGroup()">
+          <div class="mb-3">
+            <label for="groupName" class="form-label">
+              客户群组名称 <span class="text-danger">*</span>
+            </label>
+            <input type="text" class="form-control" id="groupName" 
+                   [(ngModel)]="groupForm.name" name="name" required 
+                   placeholder="请输入客户群组名称，例如：重要客户群">
+          </div>
+          
+          <div class="mb-3">
+            <label for="groupDescription" class="form-label">客户群组描述</label>
+            <textarea class="form-control" id="groupDescription" rows="3"
+                      [(ngModel)]="groupForm.description" name="description"
+                      placeholder="请输入客户群组描述（可选）"></textarea>
+          </div>
+          
+
+          
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeCreateModal()">
+              <i class="bi bi-x-circle me-2"></i>取消
+            </button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle me-2"></i>{{ editingGroup ? '保存修改' : '创建客户群组' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- 分配客户模态框 -->
+<div class="modal fade" [class.show]="showAssignModal" [style.display]="showAssignModal ? 'block' : 'none'" 
+     [class.d-block]="showAssignModal" tabindex="-1" (click)="closeAssignModal()">
+  <div class="modal-dialog modal-dialog-centered modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-people-fill text-info me-2"></i>管理客户群组成员
+        </h5>
+        <button type="button" class="btn-close" (click)="closeAssignModal()"></button>
+      </div>
+      <div class="modal-body" *ngIf="selectedGroupForAssignment">
+        <div class="alert alert-info d-flex justify-content-between align-items-center">
+          <div>
+            <i class="bi bi-tag-fill me-2"></i>
+            <strong>{{ selectedGroupForAssignment.name }}</strong>
+          </div>
+          <div>
+            <i class="bi bi-check-circle-fill text-success me-1"></i>
+            已选择 <strong>{{ selectedCustomers.length }}</strong> 个客户
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+            <input type="text" class="form-control" placeholder="搜索客户姓名、邮箱或公司..."
+                   (input)="filterCustomers($event)">
+          </div>
+        </div>
+        
+        <!-- 全选控件 -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0">所有客户</h6>
+          <button class="btn btn-sm btn-outline-secondary" 
+                  (click)="toggleSelectAllCustomers()">
+            <i class="bi me-1" [class]="'bi ' + (selectedCustomers.length === customers.length ? 'check-square' : 'square')"></i>
+            {{ selectedCustomers.length === customers.length ? '取消全选' : '全选' }}
+          </button>
+        </div>
+        
+        <div style="max-height: 300px; overflow-y: auto;">
+          <div *ngIf="filteredCustomers.length === 0" class="text-center py-4 text-muted">
+            <i class="bi bi-search fs-1"></i>
+            <p class="mt-2">未找到匹配的客户</p>
+          </div>
+          
+          <div class="list-group" *ngIf="filteredCustomers.length > 0">
+            <div class="list-group-item" *ngFor="let customer of filteredCustomers">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" 
+                       [value]="customer._id"
+                       [checked]="selectedCustomers.includes(customer._id)"
+                       (change)="onCustomerSelectionChange($event)"
+                       [id]="'customer-' + customer._id">
+                <label class="form-check-label d-flex align-items-center w-100" 
+                       [for]="'customer-' + customer._id">
+                  <i class="bi bi-person-circle fs-4 me-3 text-muted"></i>
+                  <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <strong>{{ customer.name }}</strong>
+                      <span class="badge" [class]="isCustomerInGroup(customer._id) ? 'bg-success' : 'bg-secondary'">
+                        {{ isCustomerInGroup(customer._id) ? '已在群组' : '未在群组' }}
+                      </span>
+                    </div>
+                    <div class="small text-muted">{{ customer.email }}</div>
+                    <div *ngIf="customer.company" class="small text-muted">
+                      <i class="bi bi-building me-1"></i>{{ customer.company }}
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeAssignModal()">
+            <i class="bi bi-x-circle me-2"></i>取消
+          </button>
+          <button type="button" class="btn btn-info" (click)="assignCustomersToGroup()">
+            <i class="bi bi-people-plus me-2"></i>确认更新成员
+            <span *ngIf="selectedCustomers.length > 0">({{ selectedCustomers.length }})</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 模态框背景遮罩 -->
+<div class="modal-backdrop fade" [class.show]="showCreateModal || showAssignModal" 
+     [style.display]="(showCreateModal || showAssignModal) ? 'block' : 'none'"></div>

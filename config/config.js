@@ -27,7 +27,8 @@ const baseConfig = {
   email: {
     mailgunApiKey: process.env.MAILGUN_API_KEY,
     mailgunDomain: process.env.MAILGUN_DOMAIN,
-    from: process.env.EMAIL_FROM || 'noreply@example.com'
+    from: process.env.EMAIL_FROM || 'noreply@example.com',
+    enableQuoteEmailNotifications: process.env.ENABLE_QUOTE_EMAIL_NOTIFICATIONS !== 'false'
   },
   
   // 业务配置

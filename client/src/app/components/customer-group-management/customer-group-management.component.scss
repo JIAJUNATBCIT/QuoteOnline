@@ -1,0 +1,526 @@
+.customer-group-management {
+  padding: 20px;
+  margin-top: 80px; // 与导航栏保持适当间距，避免被遮挡
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    
+    h2 {
+      margin: 0;
+      color: #333;
+    }
+    
+    .header-buttons {
+      display: flex;
+      gap: 10px;
+      
+      .btn {
+        margin-left: 0;
+      }
+    }
+  }
+  
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-size: 16px;
+    
+    i {
+      margin-right: 10px;
+      
+      &.spin-icon {
+        animation: spin 1s linear infinite;
+      }
+    }
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .alert {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    
+    &.alert-danger {
+      background-color: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+  }
+  
+  .customer-groups-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 24px;
+    padding: 0;
+    
+    .customer-group-card {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      transition: all 0.3s ease;
+      border: none;
+      
+      &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+      }
+      
+      .customer-group-header {
+        padding: 20px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 2px solid #28a745;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        
+        .customer-group-info {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          
+          h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+          }
+          
+          .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            
+            &.active {
+              background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+              color: white;
+            }
+            
+            &.inactive {
+              background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+              color: white;
+            }
+          }
+        }
+        
+        .customer-group-actions {
+          display: flex;
+          gap: 6px;
+          
+          .btn {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: none;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            
+            &:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            }
+            
+            i {
+              font-size: 14px;
+            }
+            
+            &.btn-outline-primary:hover {
+              background: #007bff;
+              color: white;
+            }
+            
+            &.btn-outline-info:hover {
+              background: #17a2b8;
+              color: white;
+            }
+            
+            &.btn-outline-danger:hover {
+              background: #dc3545;
+              color: white;
+            }
+          }
+        }
+      }
+      
+      .customer-group-body {
+        padding: 24px;
+        
+        .description {
+          color: #6c757d;
+          margin-bottom: 20px;
+          line-height: 1.6;
+          font-size: 14px;
+        }
+        
+        .customer-group-meta {
+          display: flex;
+          gap: 24px;
+          margin-bottom: 24px;
+          padding-bottom: 20px;
+          border-bottom: 1px solid #f1f3f4;
+          
+          small {
+            color: #868e96;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            
+            i {
+              margin-right: 6px;
+              color: #28a745;
+            }
+          }
+        }
+        
+        .users-section {
+          h4 {
+            margin: 0 0 16px 0;
+            font-size: 14px;
+            color: #495057;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            
+            i {
+              margin-right: 8px;
+              color: #28a745;
+              font-size: 16px;
+            }
+          }
+          
+          .users-grid {
+            display: grid;
+            gap: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            
+            .user-item {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              padding: 12px;
+              background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+              border-radius: 8px;
+              transition: all 0.2s ease;
+              border: 1px solid #e9ecef;
+              
+              &:hover {
+                background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 100%);
+                transform: translateX(2px);
+              }
+              
+              i {
+                color: #6c757d;
+                font-size: 18px;
+                flex-shrink: 0;
+              }
+              
+              .user-info {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                flex: 1;
+                min-width: 0;
+                
+                .user-name {
+                  font-weight: 600;
+                  color: #2c3e50;
+                  font-size: 13px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                }
+                
+                .user-email {
+                  color: #6c757d;
+                  font-size: 11px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                }
+                
+                .user-company {
+                  color: #868e96;
+                  font-size: 11px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                }
+              }
+              
+              .remove-btn {
+                width: 28px;
+                height: 28px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 6px;
+                border: none;
+                background: white;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                transition: all 0.2s ease;
+                
+                &:hover {
+                  background: #dc3545;
+                  color: white;
+                  transform: scale(1.1);
+                }
+                
+                i {
+                  font-size: 12px;
+                }
+              }
+            }
+            
+            /* 自定义滚动条 */
+            &::-webkit-scrollbar {
+              width: 6px;
+            }
+            
+            &::-webkit-scrollbar-track {
+              background: #f1f3f4;
+              border-radius: 3px;
+            }
+            
+            &::-webkit-scrollbar-thumb {
+              background: #cbd5e0;
+              border-radius: 3px;
+            }
+            
+            &::-webkit-scrollbar-thumb:hover {
+              background: #a0aec0;
+            }
+          }
+        }
+        
+        .empty-users {
+          text-align: center;
+          padding: 40px 20px;
+          color: #888;
+          
+          i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: #ccc;
+          }
+          
+          p {
+            margin: 0;
+            font-size: 14px;
+          }
+        }
+      }
+    }
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #888;
+    
+    i {
+      font-size: 48px;
+      margin-bottom: 16px;
+      color: #ccc;
+    }
+    
+    h3 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+    
+    p {
+      margin: 0;
+      font-size: 14px;
+    }
+  }
+}
+
+// 模态框样式
+.modal {
+  .modal-header {
+    .modal-title {
+      font-weight: 600;
+      
+      i {
+        color: #0d6efd;
+      }
+    }
+  }
+  
+
+  
+  .form-text {
+    font-size: 0.875rem;
+  }
+}
+
+// 客户选择模态框样式
+.customers-selection {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+  
+  .customer-selection-item {
+    margin-bottom: 0.5rem;
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    .form-check {
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      transition: background-color 0.2s ease;
+      display: flex;
+      align-items: flex-start;
+      
+      &:hover {
+        background-color: #f8f9fa;
+      }
+      
+      .form-check-input {
+        margin-top: 0.5rem;
+        margin-right: 0.75rem;
+        flex-shrink: 0;
+      }
+      
+      .form-check-label {
+        cursor: pointer;
+        flex: 1;
+        
+        .customer-info {
+          strong {
+            font-size: 0.875rem;
+            color: #495057;
+            display: block;
+            margin-bottom: 0.25rem;
+          }
+          
+          .text-muted {
+            font-size: 0.75rem;
+            display: block;
+          }
+        }
+      }
+    }
+  }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+  .customer-group-management {
+    padding: 1rem;
+    
+    .group-card {
+      .group-header {
+        padding: 0.75rem;
+        
+        h5 {
+          font-size: 1rem;
+        }
+      }
+      
+      .customers-section {
+        .customers-list {
+          max-height: 150px;
+        }
+      }
+    }
+  }
+}
+
+// 加载动画
+.spinner-border {
+  width: 3rem;
+  height: 3rem;
+}
+
+// 空状态样式
+.text-center.py-5 {
+  i.bi {
+    opacity: 0.5;
+  }
+  
+  h4 {
+    font-weight: 500;
+  }
+}
+
+// 下拉菜单样式
+.dropdown-menu {
+  .dropdown-item {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    
+    i {
+      width: 16px;
+      text-align: center;
+    }
+    
+    &.text-danger {
+      &:hover {
+        background-color: #f8d7da;
+        color: #842029;
+      }
+    }
+  }
+}
+
+// 状态指示器
+.text-success, .text-danger {
+  font-weight: 600;
+  
+  i {
+    font-size: 0.875rem;
+  }
+}
+
+// 按钮样式
+.btn {
+  font-weight: 500;
+  
+  &.btn-sm {
+    font-size: 0.875rem;
+  }
+}
+
+// 警告框样式
+.alert {
+  border-radius: 0.5rem;
+  border: none;
+  
+  &.alert-info {
+    background-color: #e7f5ff;
+    color: #084298;
+  }
+  
+  &.alert-success {
+    background-color: #d1e7dd;
+    color: #0f5132;
+  }
+  
+  i {
+    margin-bottom: 0.125rem;
+  }
+}

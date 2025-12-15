@@ -1,4 +1,4 @@
-.group-management {
+.supplier-group-management {
   padding: 20px;
   margin-top: 80px; // 与导航栏保持适当间距，避免被遮挡
   
@@ -55,13 +55,13 @@
     }
   }
   
-  .groups-container {
+  .supplier-groups-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
     gap: 24px;
     padding: 0;
     
-    .group-card {
+    .supplier-group-card {
       background: #ffffff;
       border-radius: 12px;
       box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
@@ -74,7 +74,7 @@
         box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
       }
       
-      .group-header {
+      .supplier-group-header {
         padding: 20px;
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         border-bottom: 2px solid #007bff;
@@ -82,7 +82,7 @@
         justify-content: space-between;
         align-items: center;
         
-        .group-info {
+        .supplier-group-info {
           display: flex;
           align-items: center;
           gap: 12px;
@@ -114,7 +114,7 @@
           }
         }
         
-        .group-actions {
+        .supplier-group-actions {
           display: flex;
           gap: 6px;
           
@@ -158,7 +158,7 @@
         }
       }
       
-      .group-body {
+      .supplier-group-body {
         padding: 24px;
         
         .description {
@@ -168,7 +168,7 @@
           font-size: 14px;
         }
         
-        .group-meta {
+        .supplier-group-meta {
           display: flex;
           gap: 24px;
           margin-bottom: 24px;
@@ -772,10 +772,10 @@
 
 // 响应式设计
 @media (max-width: 768px) {
-  .group-management {
+  .supplier-group-management {
     padding: 15px;
     
-    .groups-container {
+    .supplier-groups-container {
       grid-template-columns: 1fr;
       gap: 20px;
     }
@@ -786,25 +786,25 @@
       gap: 15px;
     }
     
-    .group-card {
-      .group-header {
+    .supplier-group-card {
+      .supplier-group-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 16px;
         
-        .group-info {
+        .supplier-group-info {
           width: 100%;
           justify-content: space-between;
         }
         
-        .group-actions {
+        .supplier-group-actions {
           width: 100%;
           justify-content: flex-end;
         }
       }
       
-      .group-body {
-        .group-meta {
+      .supplier-group-body {
+        .supplier-group-meta {
           flex-direction: column;
           gap: 8px;
         }
@@ -833,25 +833,25 @@
 }
 
 @media (max-width: 480px) {
-  .group-management {
+  .supplier-group-management {
     padding: 10px;
     
-    .groups-container {
+    .supplier-groups-container {
       gap: 16px;
     }
     
-    .group-card {
-      .group-header {
+    .supplier-group-card {
+      .supplier-group-header {
         padding: 16px;
         
-        .group-info {
+        .supplier-group-info {
           h3 {
             font-size: 16px;
           }
         }
       }
       
-      .group-body {
+      .supplier-group-body {
         padding: 20px;
         
         .description {

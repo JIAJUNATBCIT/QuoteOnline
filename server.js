@@ -13,7 +13,7 @@ app.use(cors({
   origin: config.cors.origins,
   credentials: config.cors.credentials,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-skip-interceptor']
 }));
 
 // Cookie parser middleware
@@ -97,7 +97,8 @@ mongoose.connect(config.mongodb.uri, config.mongodb.options)
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/users', require('./routes/users'));
   app.use('/api/quotes', require('./routes/quotes'));
-  app.use('/api/groups', require('./routes/groups'));
+  app.use('/api/supplierGroups', require('./routes/supplierGroups'));
+  app.use('/api/customer-groups', require('./routes/customerGroups'));
   app.use('/api/config', require('./routes/config'));
 
   // Serve Angular app in production

@@ -33,9 +33,31 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  groups: [{
+  supplierGroups: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Group'
+    ref: 'SupplierGroup'
+  }],
+  customerGroups: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CustomerGroup'
+  }],
+  customerGroupMembership: [{
+    customerGroup: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CustomerGroup'
+    },
+    joinedAt: {
+      type: Date,
+      default: Date.now
+    },
+    leftAt: {
+      type: Date,
+      default: null
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    }
   }]
 }, {
   timestamps: true

@@ -5,7 +5,8 @@ const fs = require('fs');
 const archiver = require('archiver');
 const Quote = require('../models/Quote');
 const User = require('../models/User');
-const Group = require('../models/Group');
+const SupplierGroup = require('../models/SupplierGroup');
+const CustomerGroup = require('../models/CustomerGroup');
 const { auth, authorize } = require('../middleware/auth');
 const emailService = require('../services/mailgunService');
 const logger = require('../utils/logger');
@@ -162,12 +163,27 @@ router.post('/', auth, authorize('customer'), upload.fields([
       };
     });
 
+    // 获取客户的客户群组
+    const customer = await User.findById(req.user.userId)
+      .select('customerGroups')
+      .lean();
+    
+    // 将用户的customerGroups字段内容拷贝到询价单的customerGroups字段
+    const customerGroupIds = customer?.customerGroups ? 
+      customer.customerGroups.map(id => id.toString()) : [];
+    
+    logger.info(`用户 ${req.user.userId} 创建询价单`, { 
+      customerGroupIdsCount: customerGroupIds.length,
+      customerGroups: customerGroupIds 
+    });
+
     const quote = new Quote({
       quoteNumber,
       customer: req.user.userId,
       title: quoteTitle.trim(),
       description: description?.trim() || '',
-      customerFiles: customerFiles
+      customerFiles: customerFiles,
+      customerGroups: customerGroupIds // 直接拷贝用户的群组信息
     });
 
     const saveStartTime = Date.now();
@@ -262,16 +278,35 @@ router.get('/', auth, async (req, res) => {
     // 根据用户角色设置查询条件和populate
     switch (req.user.role) {
       case 'customer':
-        query = { customer: req.user.userId };
+        // 获取当前登录用户的客户群组
+        const customerUser = await User.findById(req.user.userId).select('customerGroups');
+        const userCustomerGroupIds = customerUser ? customerUser.customerGroups.map(id => id.toString()) : [];
+        
+        // 查询条件：用户自己创建的询价单或与自己customerGroups有交集的询价单
+        if (userCustomerGroupIds.length > 0) {
+          query = { 
+            $or: [
+              { customer: req.user.userId }, // 自己创建的
+              { 
+                customerGroups: { $in: userCustomerGroupIds } // 与自己群组有交集
+              }
+            ]
+          };
+        } else {
+          // 如果用户没有加入任何群组，只能看到自己创建的询价单
+          query = { customer: req.user.userId };
+        }
+        
         populates = [
           { path: 'customer', select: 'name email company' },
+          { path: 'customerGroups', select: 'name description color' },
           { path: 'assignedGroups', select: 'name description color' }
         ];
         break;
       case 'supplier':
         // 获取供应商所在的群组
-        const supplier = await User.findById(req.user.userId).select('groups');
-        const supplierGroupIds = supplier ? supplier.groups : [];
+        const supplier = await User.findById(req.user.userId).select('supplierGroups');
+        const supplierGroupIds = supplier ? supplier.supplierGroups : [];
         
         // 供应商可以看到：
         // 1. 直接分配给自己的询价单
@@ -326,15 +361,29 @@ router.get('/:id', auth, async (req, res) => {
       .populate('customer', 'name email company')
       .populate('quoter', 'name email company')
       .populate('supplier', 'name email company')
+      .populate('customerGroups', 'name description color') // 添加customerGroups的populate
       .populate('assignedGroups', 'name description color');
 
     if (!quote) {
       return res.status(404).json({ message: '询价单不存在' });
     }
 
-    // 权限检查
-    if (req.user.role === 'customer' && quote.customer._id.toString() !== req.user.userId) {
-      return res.status(403).json({ message: '权限不足' });
+    // 权限检查 - 客户群权限控制
+    if (req.user.role === 'customer') {
+      // 获取客户的客户群组信息
+      const user = await User.findById(req.user.userId).select('customerGroups');
+      
+      // 使用简化后的权限检查工具类进行权限验证
+      // 注意：这里需要传递完整的用户对象，包括userId
+      const userWithId = {
+        ...user.toObject(),
+        userId: req.user.userId,
+        role: 'customer'
+      };
+      
+      if (!PermissionUtils.canCustomerViewQuote(quote, userWithId)) {
+        return res.status(403).json({ message: '权限不足：您无法访问此询价单' });
+      }
     }
 
     // 供应商权限检查：只能访问分配给自己的询价单或分配给所在群组的询价单
@@ -349,9 +398,9 @@ router.get('/:id', auth, async (req, res) => {
       // 检查是否属于已分配的群组
       if (!hasAccess && quote.assignedGroups && quote.assignedGroups.length > 0) {
         const user = await User.findById(req.user.userId);
-        if (user && user.groups && user.groups.length > 0) {
+        if (user && user.supplierGroups && user.supplierGroups.length > 0) {
           hasAccess = quote.assignedGroups.some(group => 
-            user.groups.includes(group._id.toString())
+            user.supplierGroups.includes(group._id.toString())
           );
         }
       }
@@ -908,7 +957,7 @@ router.patch('/:id/assign-groups', auth, async (req, res) => {
     }
 
     // 验证群组
-    const groups = await Group.find({ 
+    const groups = await SupplierGroup.find({ 
       _id: { $in: groupIds },
       isActive: true 
     });
@@ -935,9 +984,9 @@ router.patch('/:id/assign-groups', auth, async (req, res) => {
      .populate('supplier', 'name email company')
      .populate('assignedGroups', 'name description color');
 
-    // 获取所有属于这些群组的供应商
+    // 获取所有属于这些供应商群组的供应商
     const suppliers = await User.find({
-      groups: { $in: groupIds },
+      supplierGroups: { $in: groupIds },
       role: 'supplier',
       isActive: true
     });
@@ -1186,8 +1235,8 @@ router.get('/:id/download/:fileType', auth, async (req, res) => {
         // 供应商权限检查：
         // 1. 直接分配给自己的询价单
         // 2. 分配给自己所在群组的询价单
-        const supplier = await User.findById(req.user.userId).select('groups');
-        const supplierGroupIds = supplier ? supplier.groups : [];
+        const supplier = await User.findById(req.user.userId).select('supplierGroups');
+        const supplierGroupIds = supplier ? supplier.supplierGroups : [];
         
         const canAccess = (quote.supplier && quote.supplier._id?.toString() === req.user.userId) ||
                         (quote.assignedGroups && quote.assignedGroups.some(group => 
@@ -1217,8 +1266,8 @@ router.get('/:id/download/:fileType', auth, async (req, res) => {
       // 1. 自己上传的文件
       // 2. 同一群组的供应商可以互相查看报价文件
       if (req.user.role === 'supplier') {
-        const supplier = await User.findById(req.user.userId).select('groups');
-        const supplierGroupIds = supplier ? supplier.groups : [];
+        const supplier = await User.findById(req.user.userId).select('supplierGroups');
+        const supplierGroupIds = supplier ? supplier.supplierGroups : [];
         
         const canAccess = (quote.supplier && quote.supplier._id?.toString() === req.user.userId) ||
                         (quote.assignedGroups && quote.assignedGroups.some(group => 
@@ -1276,8 +1325,8 @@ router.get('/:id/download/:fileType/batch', auth, async (req, res) => {
         // 客户可以下载自己的文件，供应商可以下载分配给自己或群组的询价单
         if (req.user.role !== 'customer') {
           if (req.user.role === 'supplier') {
-            const supplier = await User.findById(req.user.userId).select('groups');
-            const supplierGroupIds = supplier ? supplier.groups : [];
+            const supplier = await User.findById(req.user.userId).select('supplierGroups');
+            const supplierGroupIds = supplier ? supplier.supplierGroups : [];
             
             const canAccess = (quote.supplier && quote.supplier._id?.toString() === req.user.userId) ||
                             (quote.assignedGroups && quote.assignedGroups.some(group => 
@@ -1298,8 +1347,8 @@ router.get('/:id/download/:fileType/batch', auth, async (req, res) => {
         
         // 供应商可以下载自己或同群组供应商上传的文件，报价员和管理员可以下载所有供应商文件
         if (req.user.role === 'supplier') {
-          const supplier = await User.findById(req.user.userId).select('groups');
-          const supplierGroupIds = supplier ? supplier.groups : [];
+          const supplier = await User.findById(req.user.userId).select('supplierGroups');
+          const supplierGroupIds = supplier ? supplier.supplierGroups : [];
           
           const canAccess = (quote.supplier && quote.supplier._id?.toString() === req.user.userId) ||
                           (quote.assignedGroups && quote.assignedGroups.some(group => 
