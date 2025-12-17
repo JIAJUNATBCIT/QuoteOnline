@@ -1,10 +1,7 @@
 <div class="container mt-4 quote-detail-content" *ngIf="!loading">
   <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card-header">
       <h4 class="mb-0">询价单详情</h4>
-      <button *ngIf="canEdit() && !editMode" class="btn btn-outline-primary btn-sm" (click)="toggleEditMode()" [disabled]="uploading">
-        编辑
-      </button>
     </div>
     
     <!-- 询价进度条 -->
@@ -49,14 +46,12 @@
           
           <div class="mb-3">
             <label class="form-label fw-bold">标题:</label>
-            <div *ngIf="!editMode" class="form-control-plaintext">{{ quote.title }}</div>
-            <input *ngIf="editMode" type="text" class="form-control" [(ngModel)]="quoteForm.title">
+            <div class="form-control-plaintext">{{ quote.title }}</div>
           </div>
           
           <div class="mb-3">
             <label class="form-label fw-bold">描述:</label>
-            <div *ngIf="!editMode" class="form-control-plaintext">{{ quote.description }}</div>
-            <textarea *ngIf="editMode" class="form-control" rows="3" [(ngModel)]="quoteForm.description"></textarea>
+            <div class="form-control-plaintext">{{ quote.description }}</div>
           </div>
           
           <div class="mb-3" *ngIf="quote.rejectReason">
@@ -343,11 +338,7 @@
         </div>
       </div>
       
-      <!-- 编辑模式按钮 -->
-      <div *ngIf="editMode" class="mt-4">
-        <button class="btn btn-success me-2" (click)="saveChanges()" [disabled]="uploading">保存</button>
-        <button class="btn btn-secondary" (click)="toggleEditMode()" [disabled]="uploading">取消</button>
-      </div>
+
     </div>
   </div>
 </div>

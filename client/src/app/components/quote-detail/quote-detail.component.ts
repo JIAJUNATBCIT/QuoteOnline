@@ -31,8 +31,6 @@ export class QuoteDetailComponent implements OnInit {
   quoters: any[] = [];
   suppliers: any[] = [];
   supplierGroups: SupplierGroup[] = [];
-  editMode = false;
-  quoteForm: any = {};
   uploading = false;
   uploadProgress = 0;
   assigning = false;
@@ -84,7 +82,6 @@ export class QuoteDetailComponent implements OnInit {
     this.quoteService.getQuoteById(id).subscribe({
       next: (quote) => {
         this.quote = quote;
-        this.quoteForm = { ...quote };
         this.loading = false;
 
       },
@@ -745,36 +742,7 @@ export class QuoteDetailComponent implements OnInit {
 
 
 
-  toggleEditMode() {
-    this.editMode = !this.editMode;
-    if (this.editMode) {
-      this.quoteForm = { ...this.quote };
-    }
-  }
 
-  saveChanges() {
-    if (!this.quote) return;
-    
-    const formData = new FormData();
-    formData.append('title', this.quoteForm.title);
-    formData.append('description', this.quoteForm.description);
-    
-    this.quoteService.updateQuote(this.quote._id, formData).subscribe({
-      next: (quote) => {
-        this.ngZone.run(() => {
-          this.quote = quote;
-          this.editMode = false;
-          alert('更新成功');
-        });
-      },
-      error: (error) => {
-        this.ngZone.run(() => {
-          console.error('更新失败:', error);
-          alert('更新失败');
-        });
-      }
-    });
-  }
 
   updateUrgentStatus() {
     if (!this.quote) return;
@@ -802,13 +770,7 @@ export class QuoteDetailComponent implements OnInit {
     });
   }
 
-  canEdit(): boolean {
-    if (!this.quote) return false;
-    const user = this.authService.getCurrentUser();
-    if (!user) return false;
-    
-    return this.permissionService.canEditQuote(this.quote, user);
-  }
+
 
   canReject(): boolean {
     if (!this.quote) return false;

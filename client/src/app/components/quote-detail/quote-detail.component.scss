@@ -1,45 +1,59 @@
 // Quote Detail Component Styles
 
-// Quote detail content spacing to avoid navbar overlap
+// Quote detail content spacing
 .quote-detail-content {
-  margin-top: 100px; // Height of fixed navbar + more spacing for better visual separation
+  margin-top: 200px; // Maximum spacing to ensure title visibility
+  padding-top: 40px;
+  
+  .card {
+    // Ensure the card container is properly positioned
+    position: relative;
+    z-index: 1;
+  }
 }
 
 // 进度条相关样式
 .progress-container {
-  padding-top: 2%;
-  .progress {
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
-    
-    .progress-bar {
-      font-size: 12px;
-      font-weight: 600;
-      text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
-      transition: width 0.6s ease;
-    }
-  }
+  padding-top: 0.5%; // Reduced padding to decrease space between header and progress bar
+}
+
+// Reduce spacing for progress bar container
+.card-body.bg-light {
+  padding-top: 1rem !important; // Reduced from py-3 (1.5rem) to 1rem
+  padding-bottom: 0rem !important;
+}
+
+.progress {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
   
-  .progress-step {
-    font-size: 11px;
-    font-weight: 500;
-    text-align: center;
-    flex: 1;
-    position: relative;
-    
-    &:not(:last-child)::after {
-      content: '';
-      position: absolute;
-      right: -10px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 0;
-      height: 0;
-      border-left: 4px solid #dee2e6;
-      border-top: 4px solid transparent;
-      border-bottom: 4px solid transparent;
-    }
+  .progress-bar {
+    font-size: 12px;
+    font-weight: 600;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+    transition: width 0.6s ease;
+  }
+}
+
+.progress-step {
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  flex: 1;
+  position: relative;
+  
+  &:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid #dee2e6;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
   }
 }
 .quote-detail-container {
@@ -47,9 +61,26 @@
   margin: 0 auto;
 }
 
+// Card spacing adjustment
+.card {
+  margin-bottom: 2rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
 .card-header {
   background-color: #f8f9fa;
   border-bottom: 1px solid #dee2e6;
+  padding: 2.5rem 1.5rem 1.5rem 1.5rem; // Reduced padding to decrease white space
+  min-height: auto; // Auto height to reduce unnecessary space
+  position: relative;
+  z-index: 5; // Ensure header is above navbar if needed
+  
+  h4 {
+    margin: 0;
+    line-height: 1.4;
+    font-size: 1.5rem; // Slightly larger title for better visibility
+  }
 }
 
 .form-control-plaintext {
@@ -169,8 +200,15 @@
 
 
 
+
+
 // 响应式调整
 @media (max-width: 768px) {
+  .quote-detail-content {
+    margin-top: 160px; // Increased spacing for mobile devices
+    padding-top: 30px;
+  }
+  
   .file-operation {
     .file-link-container {
       flex-direction: column;
