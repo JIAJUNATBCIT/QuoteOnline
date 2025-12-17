@@ -18,7 +18,7 @@
           </a>
         </li>
 
-        <li class="nav-item" *ngIf="authService.hasRole('customer')">
+        <li class="nav-item" *ngIf="authService.hasRole(['customer', 'admin'])">
           <a class="nav-link d-flex align-items-center" routerLink="/quotes/create" routerLinkActive="active" (click)="closeMobileMenu()">
             <i class="bi bi-plus-circle me-2"></i>
             <span>创建询价</span>

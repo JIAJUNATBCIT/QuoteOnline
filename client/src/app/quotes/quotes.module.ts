@@ -14,8 +14,8 @@ const routes: Routes = [
   {
     path: 'create',
     component: QuoteCreateComponent,
-    canActivate: [AuthGuard, RoleGuard],
-    data: { roles: ['customer'] }
+    canActivate: [AuthGuard],
+    data: { roles: ['customer', 'admin'] }
   },
   {
     path: ':id',
