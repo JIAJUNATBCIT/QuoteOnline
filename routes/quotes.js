@@ -120,8 +120,8 @@ async function generateQuoteNumber() {
 
 
 
-// Create quote (customer only)
-router.post('/', auth, authorize('customer'), upload.fields([
+// Create quote (customer and admin)
+router.post('/', auth, authorize('customer', 'admin'), upload.fields([
   { name: 'customerFiles', maxCount: 10 }
 ]), async (req, res) => {
   const startTime = Date.now();
