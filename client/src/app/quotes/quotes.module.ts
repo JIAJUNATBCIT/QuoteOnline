@@ -7,6 +7,7 @@ import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 // 导入组件
 import { QuoteCreateComponent } from '../components/quote-create/quote-create.component';
 import { QuoteDetailComponent } from '../components/quote-detail/quote-detail.component';
+import { FilePreviewModalComponent } from '../components/shared/file-preview-modal/file-preview-modal.component';
 import { AuthGuard } from '../guards/auth.guard';
 import { RoleGuard } from '../guards/role.guard';
 
@@ -27,7 +28,8 @@ const routes: Routes = [
 @NgModule({
   declarations: [
     QuoteCreateComponent,
-    QuoteDetailComponent
+    QuoteDetailComponent,
+    FilePreviewModalComponent
   ],
   imports: [
     CommonModule,

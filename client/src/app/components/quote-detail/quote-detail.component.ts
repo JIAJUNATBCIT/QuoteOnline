@@ -50,6 +50,15 @@ export class QuoteDetailComponent implements OnInit {
     supplier: [],
     quoter: []
   };
+  
+  // 文件预览相关属性
+  currentPreviewFile: any = null;
+  currentPreviewType: string = '';
+  currentPreviewIndex: number = 0;
+  previewUrl: string = '';
+  previewLoading: boolean = false;
+  previewError: string = '';
+  private previewModal: any = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -214,6 +223,183 @@ export class QuoteDetailComponent implements OnInit {
         });
       }
     });
+  }
+
+  // 单个文件下载（新增方法）
+  downloadSingleFile(fileType: string, fileIndex?: number) {
+    if (!this.quote || this.uploading) return;
+    
+    // 根据用户角色和询价单状态决定下载哪个文件
+    const user = this.authService.getCurrentUser();
+    if (!user) return;
+    
+    let actualFileType = fileType;
+    
+    if (user.role === 'customer') {
+      // 客户：未报价时下载原文件，已报价时下载报价文件
+      actualFileType = this.quote.status === 'quoted' ? 'quoter' : 'customer';
+    }
+    
+    this.quoteService.downloadFile(this.quote._id, actualFileType, fileIndex).subscribe({
+      next: (blob) => {
+        this.ngZone.run(() => {
+          try {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            
+            // 获取文件名
+            const files = this.getFiles(actualFileType);
+            const targetFile = fileIndex !== undefined && files[fileIndex] 
+              ? files[fileIndex] 
+              : files[0];
+            const originalName = targetFile?.originalName || `${this.quote?.quoteNumber}_${actualFileType}.xlsx`;
+            
+            a.download = originalName;
+            
+            // 使用setTimeout确保DOM操作完成
+            setTimeout(() => {
+              a.click();
+              // 延迟清理URL和DOM元素
+              setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+              }, 100);
+            }, 0);
+          } catch (error) {
+            console.error('下载文件处理失败:', error);
+            alert('下载文件处理失败');
+          }
+        });
+      },
+      error: (error) => {
+        this.ngZone.run(() => {
+          console.error('下载文件失败:', error);
+          alert('下载文件失败');
+        });
+      }
+    });
+  }
+
+  // 文件预览
+  previewFile(fileType: string, fileIndex?: number) {
+    if (!this.quote || this.uploading) return;
+    
+    // 根据用户角色和询价单状态决定预览哪个文件
+    const user = this.authService.getCurrentUser();
+    if (!user) return;
+    
+    let actualFileType = fileType;
+    
+    if (user.role === 'customer') {
+      // 客户：未报价时预览原文件，已报价时预览报价文件
+      actualFileType = this.quote.status === 'quoted' ? 'quoter' : 'customer';
+    }
+    
+    // 获取文件信息
+    const files = this.getFiles(actualFileType);
+    const targetFile = fileIndex !== undefined && files[fileIndex] 
+      ? files[fileIndex] 
+      : files[0];
+    
+    if (!targetFile) {
+      alert('文件不存在');
+      return;
+    }
+    
+    // 如果是Office文件，直接下载而不是预览
+    if (this.isOfficeFile(targetFile.originalName)) {
+      this.downloadSingleFile(actualFileType, fileIndex);
+      return;
+    }
+    
+    this.currentPreviewFile = targetFile;
+    this.currentPreviewType = actualFileType;
+    this.currentPreviewIndex = fileIndex || 0;
+    this.previewLoading = true;
+    this.previewError = '';
+    
+    // 下载文件用于预览（仅支持图片和PDF）
+    console.log('开始预览文件:', targetFile.originalName, '类型:', actualFileType, '索引:', fileIndex);
+    this.quoteService.downloadFile(this.quote._id, actualFileType, fileIndex).subscribe({
+      next: (blob) => {
+        this.ngZone.run(() => {
+          this.previewUrl = window.URL.createObjectURL(blob);
+          console.log('文件预览URL已创建:', this.previewUrl, '文件大小:', blob.size, '类型:', blob.type);
+          
+          // 对于图片和PDF，检查实际的blob类型是否匹配文件扩展名
+          if (this.isImageFile(targetFile.originalName) && !blob.type.startsWith('image/')) {
+            console.warn('图片文件类型不匹配，文件名:', targetFile.originalName, '实际类型:', blob.type);
+          } else if (this.isPdfFile(targetFile.originalName) && blob.type !== 'application/pdf') {
+            console.warn('PDF文件类型不匹配，文件名:', targetFile.originalName, '实际类型:', blob.type);
+          }
+          
+          this.previewLoading = false;
+          
+          // 显示预览模态框
+          this.showPreviewModal();
+        });
+      },
+      error: (error) => {
+        this.ngZone.run(() => {
+          this.previewLoading = false;
+          this.previewError = '无法加载文件预览，请检查文件是否完整或尝试下载文件查看';
+          console.error('预览文件失败:', error);
+          
+          // 显示预览模态框（显示错误信息）
+          this.showPreviewModal();
+        });
+      }
+    });
+  }
+
+  // 显示预览模态框
+  private showPreviewModal() {
+    // 等待下一个变化检测周期，确保 DOM 已更新
+    setTimeout(() => {
+      const modalElement = document.getElementById('filePreviewModal');
+      if (modalElement) {
+        if (!this.previewModal) {
+          this.previewModal = new (window as any).bootstrap.Modal(modalElement);
+        }
+        this.previewModal.show();
+      } else {
+        console.error('模态框元素未找到');
+      }
+    }, 0);
+  }
+
+  // 隐藏预览模态框
+  private hidePreviewModal() {
+    if (this.previewModal) {
+      this.previewModal.hide();
+    }
+  }
+
+  // 检查是否为图片文件
+  isImageFile(filename: string): boolean {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+    const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+    return imageExtensions.includes(extension);
+  }
+
+  // 检查是否为PDF文件
+  isPdfFile(filename: string): boolean {
+    return filename.toLowerCase().endsWith('.pdf');
+  }
+
+  // 检查是否为Office文件
+  isOfficeFile(filename: string): boolean {
+    const officeExtensions = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'];
+    const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+    return officeExtensions.includes(extension);
+  }
+
+  // 检查文件是否可以预览
+  isPreviewable(filename: string): boolean {
+    return this.isImageFile(filename) || this.isPdfFile(filename);
   }
 
   // 批量下载文件
@@ -1069,6 +1255,19 @@ export class QuoteDetailComponent implements OnInit {
     }
     
     return this.quote.assignedGroups.map((g: any) => g.name).join(', ');
+  }
+
+  ngOnDestroy() {
+    // 清理预览URL和模态框
+    if (this.previewUrl) {
+      window.URL.revokeObjectURL(this.previewUrl);
+      this.previewUrl = '';
+    }
+    
+    if (this.previewModal) {
+      this.previewModal.dispose();
+      this.previewModal = null;
+    }
   }
 
 }

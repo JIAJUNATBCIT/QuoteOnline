@@ -202,6 +202,77 @@
 
 
 
+// 文件预览相关样式
+.file-preview-container {
+  min-height: 400px;
+  
+  .img-fluid {
+    max-height: 70vh;
+    object-fit: contain;
+  }
+  
+  .embed-responsive {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    
+    &::before {
+      display: block;
+      content: "";
+      padding-top: 56.25%; // 16:9 aspect ratio
+    }
+    
+    .embed-responsive-item {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  }
+}
+
+// 模态框响应式调整
+.modal-xl {
+  @media (max-width: 576px) {
+    max-width: 95vw;
+    margin: 1rem;
+  }
+  
+  @media (min-width: 577px) and (max-width: 768px) {
+    max-width: 90vw;
+  }
+  
+  @media (min-width: 769px) and (max-width: 992px) {
+    max-width: 85vw;
+  }
+}
+
+// 文件操作容器优化
+.file-link-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  
+  .file-link {
+    flex: 1;
+    min-width: 0; // 允许文本截断
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .btn-sm {
+    flex-shrink: 0; // 防止按钮被压缩
+  }
+}
+
 // 响应式调整
 @media (max-width: 768px) {
   .quote-detail-content {
@@ -217,10 +288,44 @@
       .file-link {
         max-width: 100%;
         margin-bottom: 0.5rem;
+        width: 100%;
       }
       
       .btn {
         margin-left: 0 !important;
+        align-self: flex-start;
+      }
+    }
+  }
+  
+  // 移动端预览模态框优化
+  .modal-xl {
+    .modal-body {
+      padding: 1rem;
+      
+      .file-preview-container {
+        min-height: 300px;
+        
+        .img-fluid {
+          max-height: 50vh;
+        }
+        
+        .embed-responsive-item {
+          height: 50vh;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .file-link-container {
+    .btn-sm {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      
+      .bi {
+        font-size: 0.875rem;
       }
     }
   }
