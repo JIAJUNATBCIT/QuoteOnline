@@ -237,13 +237,6 @@
           <div class="alert" [ngClass]="getTempFilesByType('customer').length > 0 ? 'alert-warning' : 'alert-primary'">
             <div class="d-flex justify-content-between align-items-center">
               <strong>客户询价文件:</strong>
-              <button *ngIf="getFiles('customer').length > 0 && getTempFilesByType('customer').length === 0" 
-                      class="btn btn-primary btn-sm" 
-                      (click)="downloadFilesBatch('customer')" 
-                      [disabled]="uploading" 
-                      title="一键下载所有询价文件">
-                <i class="bi bi-download me-1"></i>一键下载
-              </button>
             </div>
 
 
@@ -279,6 +272,13 @@
 
 
             <div class="mt-2">
+              <button *ngIf="getFiles('customer').length > 1 && getTempFilesByType('customer').length === 0" 
+                      class="btn btn-primary btn-sm me-2" 
+                      (click)="downloadFilesBatch('customer')" 
+                      [disabled]="uploading" 
+                      title="一键下载所有询价文件">
+                <i class="bi bi-download me-1"></i>一键下载
+              </button>
               <button *ngIf="getTempFilesByType('customer').length > 0" 
                       class="btn btn-success btn-sm me-2" 
                       (click)="confirmUpdateFiles('customer')" 
@@ -301,13 +301,6 @@
           <div class="alert" [ngClass]="getTempFilesByType('supplier').length > 0 ? 'alert-warning' : 'alert-info'">
             <div class="d-flex justify-content-between align-items-center">
               <strong>供应商报价文件:</strong>
-              <button *ngIf="getFiles('supplier').length > 0 && getTempFilesByType('supplier').length === 0" 
-                      class="btn btn-info btn-sm" 
-                      (click)="downloadFilesBatch('supplier')" 
-                      [disabled]="uploading" 
-                      title="一键下载所有报价文件">
-                <i class="bi bi-download me-1"></i>一键下载
-              </button>
             </div>
 
 
@@ -343,6 +336,13 @@
 
 
             <div class="mt-2">
+              <button *ngIf="getFiles('supplier').length > 1 && getTempFilesByType('supplier').length === 0" 
+                      class="btn btn-info btn-sm me-2" 
+                      (click)="downloadFilesBatch('supplier')" 
+                      [disabled]="uploading" 
+                      title="一键下载所有报价文件">
+                <i class="bi bi-download me-1"></i>一键下载
+              </button>
               <button *ngIf="quote.status === 'in_progress' && authService.hasRole('supplier')" 
                       class="btn btn-success btn-sm me-2" 
                       (click)="confirmSupplierQuote()" 
@@ -372,13 +372,6 @@
           <div class="alert" [ngClass]="getTempFilesByType('quoter').length > 0 ? 'alert-warning' : 'alert-success'">
             <div class="d-flex justify-content-between align-items-center">
               <strong>最终报价文件:</strong>
-              <button *ngIf="getFiles('quoter').length > 0 && getTempFilesByType('quoter').length === 0" 
-                      class="btn btn-success btn-sm" 
-                      (click)="downloadFilesBatch('quoter')" 
-                      [disabled]="uploading" 
-                      title="一键下载所有最终报价文件">
-                <i class="bi bi-download me-1"></i>一键下载
-              </button>
             </div>
 
 
@@ -414,6 +407,13 @@
 
 
             <div class="mt-2">
+              <button *ngIf="getFiles('quoter').length > 1 && getTempFilesByType('quoter').length === 0" 
+                      class="btn btn-success btn-sm me-2" 
+                      (click)="downloadFilesBatch('quoter')" 
+                      [disabled]="uploading" 
+                      title="一键下载所有最终报价文件">
+                <i class="bi bi-download me-1"></i>一键下载
+              </button>
               <button *ngIf="quote.status !== 'quoted' && authService.hasRole('quoter')" 
                       class="btn btn-primary btn-sm me-2" 
                       (click)="confirmFinalQuote()" 
