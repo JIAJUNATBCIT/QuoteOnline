@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "dev:server": "npm run server",
     "dev:client": "npm run client",
-    "prod": "npm run start",
+    "prod": "npm run build:prod && npm run start:prod",
     "prod:build": "npm run build:prod",
     "test": "npm run start",
     "server": "nodemon server.js",
