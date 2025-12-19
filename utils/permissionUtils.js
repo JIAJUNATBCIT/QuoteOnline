@@ -166,8 +166,9 @@ class PermissionUtils {
     
     switch (user.role) {
       case 'customer':
-        return quote.customer._id?.toString() === user.userId?.toString() || 
-               quote.customer?.toString() === user.userId?.toString();
+        return (quote.customer._id?.toString() === user.userId?.toString() || 
+                quote.customer?.toString() === user.userId?.toString()) &&
+               quote.status === 'pending';
       case 'admin':
         return true;
       default:

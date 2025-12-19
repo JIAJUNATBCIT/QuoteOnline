@@ -73,7 +73,8 @@ export class PermissionUtils {
     switch (user.role) {
       case 'customer':
         const userId = user._id;
-        return quote.customer._id === userId || quote.customer === userId;
+        return (quote.customer._id === userId || quote.customer === userId) &&
+               quote.status === 'pending';
       case 'admin':
         return true;
       default:
