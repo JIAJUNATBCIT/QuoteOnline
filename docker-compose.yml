@@ -1,0 +1,67 @@
+version: '3.8'
+
+# 自定义网络（服务间通信隔离）
+networks:
+  quote-network:
+    driver: bridge
+
+# 持久化卷（避免容器删除丢失数据）
+volumes:
+  app-logs:          # 后端PM2日志卷
+  app-uploads:       # 后端上传文件卷
+  nginx-logs:        # Nginx日志卷
+
+services:
+  # 1. 后端服务（PM2启动，无需本地MongoDB）
+  backend:
+    build: .  # 基于根目录Dockerfile构建
+    restart: always
+    networks:
+      - quote-network
+    environment:
+      # 服务器配置（从.env注入）
+      - NODE_ENV=${NODE_ENV}
+      - PORT=${PORT}
+      # MongoDB Atlas配置（直接使用.env中的MONGODB_URI）
+      - MONGODB_URI=${MONGODB_URI}
+      # JWT配置（补充JWT_REFRESH_SECRET）
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      # CORS配置
+      - FRONTEND_URL=${FRONTEND_URL}
+      # 邮件配置（QQ企业邮箱+Mailgun）
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - ENABLE_QUOTE_EMAIL_NOTIFICATIONS=${ENABLE_QUOTE_EMAIL_NOTIFICATIONS}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
+      # 上传文件配置
+      - UPLOAD_PATH=${UPLOAD_PATH}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE}
+    volumes:
+      - app-logs:/app/logs
+      - app-uploads:/app/uploads  # 持久化上传文件
+    # 仅内网访问，通过Nginx代理
+    expose:
+      - 3000
+
+  # 2. Nginx服务（前端+代理+HTTPS）
+  nginx:
+    build: ./nginx  # 基于nginx目录Dockerfile构建
+    depends_on:
+      - backend
+    volumes:
+      # 挂载宿主机SSL证书（Certbot生成）
+      - /etc/letsencrypt:/etc/letsencrypt
+      # 挂载Nginx日志到宿主机
+      - nginx-logs:/var/log/nginx
+    restart: always
+    networks:
+      - quote-network
+    # 暴露80/443端口到宿主机（必须）
+    ports:
+      - "80:80"
+      - "443:443"

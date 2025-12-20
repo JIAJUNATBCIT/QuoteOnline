@@ -131,3 +131,6 @@ ehthumbs.db
 Thumbs.db
 
 EnvTemplates.md
+
+# Docker相关（可选，若不需要提交构建缓存）
+.dockerignore
