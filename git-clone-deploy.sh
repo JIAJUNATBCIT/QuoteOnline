@@ -165,6 +165,12 @@ main() {
     # 5. 触发 GitHub Actions 获取 Environment Secrets
     trigger_github_actions
 
+    echo "等待 .env 文件生成..."
+    while [ ! -f "$PROJECT_DIR/.env" ]; do
+        sleep 2
+    done
+    echo ".env 文件生成完成"
+
     # 6. 启动/重启服务
     echo -e "\033[32m===== 启动服务 =====\033[0m"
     cd "$PROJECT_DIR"
