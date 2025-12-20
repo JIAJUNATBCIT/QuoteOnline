@@ -153,12 +153,18 @@ main() {
 
     # 4. 执行 git clone / pull
     echo -e "\033[32m===== 克隆/更新代码仓库 =====\033[0m"
-    mkdir -p $(dirname "$PROJECT_DIR")
-    if [ -d "$PROJECT_DIR" ]; then
-        cd "$PROJECT_DIR" && git pull origin main
+    mkdir -p "$(dirname "$PROJECT_DIR")"
+
+    if [ -d "$PROJECT_DIR/.git" ]; then
+        echo "检测到已存在 Git 仓库，执行 git pull"
+        cd "$PROJECT_DIR"
+        git pull origin main
     else
+        echo "未检测到 Git 仓库，执行 git clone"
+        rm -rf "$PROJECT_DIR"
         git clone "https://github.com/$GITHUB_USERNAME/$GITHUB_REPO.git" "$PROJECT_DIR"
     fi
+
 
     # 5. 触发 GitHub Actions 获取 Environment Secrets
     trigger_github_actions
