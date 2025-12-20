@@ -145,7 +145,7 @@ main() {
 
     # 4. 执行 git clone / pull
     echo -e "\033[32m===== 克隆/更新代码仓库 =====\033[0m"
-    mkdir -p \$(dirname "$PROJECT_DIR")
+    mkdir -p $(dirname "$PROJECT_DIR")
     if [ -d "$PROJECT_DIR" ]; then
         cd "$PROJECT_DIR" && git pull origin main
     else
