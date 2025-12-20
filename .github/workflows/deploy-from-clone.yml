@@ -1,7 +1,7 @@
 name: Deploy from Clone (Environment Secrets)
 
 on:
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
     inputs:
       server_ip:
         description: '生产服务器IP'
@@ -11,7 +11,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production  # 使用 production 环境 Secrets
+    environment: production
     steps:
       - name: Install dependencies
         run: |
@@ -27,7 +27,6 @@ jobs:
           MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
           SIGN_SECRET: ${{ secrets.SIGN_SECRET }}
         run: |
-          # 构建 JSON 格式的敏感信息
           secrets_payload=$(jq -n -c \
             --arg MONGODB_URI "$MONGODB_URI" \
             --arg JWT_SECRET "$JWT_SECRET" \
@@ -35,11 +34,7 @@ jobs:
             --arg EMAIL_PASS "$EMAIL_PASS" \
             --arg MAILGUN_API_KEY "$MAILGUN_API_KEY" \
             '{"MONGODB_URI":$MONGODB_URI,"JWT_SECRET":$JWT_SECRET,"JWT_REFRESH_SECRET":$JWT_REFRESH_SECRET,"EMAIL_PASS":$EMAIL_PASS,"MAILGUN_API_KEY":$MAILGUN_API_KEY}')
-
-          # 生成签名
           signature=$(echo -n "$secrets_payload" | openssl dgst -sha256 -hmac "$SIGN_SECRET" | awk '{print $2}')
-
-          # 保存到 Actions 环境变量
           echo "secrets_payload=$secrets_payload" >> $GITHUB_ENV
           echo "signature=$signature" >> $GITHUB_ENV
 
@@ -50,15 +45,12 @@ jobs:
           SECRETS_PAYLOAD: ${{ env.secrets_payload }}
           SIGNATURE: ${{ env.signature }}
         run: |
-          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no root@$SERVER_IP bash -s << 'EOF_REMOTE'
-            # 远程执行的变量
-            SECRETS_PAYLOAD='${{ env.secrets_payload }}'
-            SIGNATURE='${{ env.signature }}'
+          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no root@$SERVER_IP bash -s <<'EOF_REMOTE'
+          secrets_payload="${SECRETS_PAYLOAD}"
+          signature="${SIGNATURE}"
 
-            # 写入远程文件
-            printf '%s' "$SECRETS_PAYLOAD" > /tmp/secrets_payload.json
-            printf '%s' "$SIGNATURE" > /tmp/signature.txt
-
-            # 执行 generate-env.sh
-            /var/www/QuoteOnline/generate-env.sh
-EOF_REMOTE
+          printf '%s' "$secrets_payload" > /tmp/secrets_payload.json
+          printf '%s' "$signature" > /tmp/signature.txt
+          
+          /var/www/QuoteOnline/generate-env.sh
+          EOF_REMOTE
