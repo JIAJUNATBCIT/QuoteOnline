@@ -27,7 +27,7 @@ jobs:
           MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
           SIGN_SECRET: ${{ secrets.SIGN_SECRET }}
         run: |
-          # 生成 JSON 格式的敏感信息
+          # 构建 JSON 格式的敏感信息
           secrets_payload=$(jq -n -c \
             --arg MONGODB_URI "$MONGODB_URI" \
             --arg JWT_SECRET "$JWT_SECRET" \
@@ -36,10 +36,10 @@ jobs:
             --arg MAILGUN_API_KEY "$MAILGUN_API_KEY" \
             '{"MONGODB_URI":$MONGODB_URI,"JWT_SECRET":$JWT_SECRET,"JWT_REFRESH_SECRET":$JWT_REFRESH_SECRET,"EMAIL_PASS":$EMAIL_PASS,"MAILGUN_API_KEY":$MAILGUN_API_KEY}')
           
-          # 生成 HMAC-SHA256 签名
+          # 生成签名（防止敏感信息被篡改）
           signature=$(echo -n "$secrets_payload" | openssl dgst -sha256 -hmac "$SIGN_SECRET" | awk '{print $2}')
           
-          # 写入环境变量传递给下一步
+          # 保存到环境变量传递给下一步
           echo "SECRETS_PAYLOAD=$secrets_payload" >> $GITHUB_ENV
           echo "SIGNATURE=$signature" >> $GITHUB_ENV
 
@@ -50,17 +50,24 @@ jobs:
           SECRETS_PAYLOAD: ${{ env.SECRETS_PAYLOAD }}
           SIGNATURE: ${{ env.SIGNATURE }}
         run: |
-          # 在本地生成 deploy 脚本
+          # 在本地生成临时文件
+          echo "$SECRETS_PAYLOAD" > secrets_payload.json
+          echo "$SIGNATURE" > signature.txt
+
+          # 生成 deploy.sh
           echo "#!/bin/bash
           cp /tmp/secrets_payload.json /var/www/QuoteOnline/
           cp /tmp/signature.txt /var/www/QuoteOnline/
           /var/www/QuoteOnline/generate-env.sh" > deploy.sh
           chmod +x deploy.sh
 
-          # 上传 secrets 文件和 deploy.sh 到服务器
+          # 上传文件到服务器
           sshpass -p "$SERVER_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            <(echo "$SECRETS_PAYLOAD") <(echo "$SIGNATURE") deploy.sh root@$SERVER_IP:/tmp/
+            secrets_payload.json signature.txt deploy.sh root@$SERVER_IP:/tmp/
 
           # 执行 deploy.sh
           sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             root@$SERVER_IP "bash /tmp/deploy.sh"
+
+          # 清理本地临时文件
+          rm -f secrets_payload.json signature.txt deploy.sh
