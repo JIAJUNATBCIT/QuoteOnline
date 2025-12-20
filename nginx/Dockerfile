@@ -1,34 +1,38 @@
-# 阶段1：构建Angular前端（Node 20满足Angular 18的版本要求）
+# ===============================
+# 阶段1：构建 Angular 前端
+# ===============================
 FROM node:20-alpine as build-stage
+
 WORKDIR /app
 
 # 复制前端依赖文件
-COPY package*.json ./
+COPY client/package*.json ./
 
-# 安装前端依赖（解决Angular 18的peer依赖冲突）
+# 安装前端依赖
 RUN npm install --legacy-peer-deps
 
-# 复制所有前端文件（包括scripts/优化脚本）
-COPY . .
+# 复制前端源码
+COPY client/ ./
 
-# 执行生产优化构建（对应package.json的build:optimized）
+# 构建 Angular 生产包
 RUN npm run build:optimized
 
-# 阶段2：Nginx部署（轻量Alpine镜像）
+# ===============================
+# 阶段2：Nginx 部署
+# ===============================
 FROM nginx:alpine as production-stage
 
-# 复制构建好的前端静态文件到Nginx默认目录
+# 复制构建好的前端静态文件
 COPY --from=build-stage /app/dist/quote-online-client /usr/share/nginx/html
 
-# 复制自定义Nginx配置（替换容器默认配置）
-# nginx.conf 位于 build context 外，要改成 COPY 时相对 build context 的路径
+# 复制自定义 Nginx 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# 设置静态文件权限（解决Linux权限问题）
+# 设置静态文件权限
 RUN chmod -R 755 /usr/share/nginx/html
 
-# 暴露80/443端口（HTTPS/HTTP）
+# 暴露端口
 EXPOSE 80 443
 
-# 启动Nginx（前台运行，保证容器不退出）
+# 前台启动 Nginx
 CMD ["nginx", "-g", "daemon off;"]
