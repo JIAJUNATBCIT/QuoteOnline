@@ -42,12 +42,12 @@ services:
 
   nginx:
     build:
-      context: .
+      context: .                    # 根目录
       dockerfile: ./nginx/Dockerfile
     depends_on:
       - backend
     volumes:
-      - /etc/letsencrypt:/etc/letsencrypt   # SSL 证书挂载
+      - /etc/letsencrypt:/etc/letsencrypt   # SSL 证书
       - nginx-logs:/var/log/nginx
     restart: always
     networks:
