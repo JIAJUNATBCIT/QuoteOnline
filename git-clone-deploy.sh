@@ -119,13 +119,21 @@ trigger_github_actions() {
 # ===================== 工具函数：安装依赖 =====================
 install_dependencies() {
     echo -e "\033[32m===== 安装必需依赖 =====\033[0m"
-    sudo apt update -y > /dev/null 2>&1
+
+    sudo apt update -y
+
     DEPS=("git" "jq" "openssl" "docker.io" "docker-compose" "curl")
-    for dep in "\${DEPS[@]}"; do
-        command -v "\$dep" &> /dev/null || sudo apt install -y "\$dep" > /dev/null 2>&1
+    for dep in "${DEPS[@]}"; do
+        if ! command -v "$dep" &> /dev/null; then
+            echo "安装 $dep ..."
+            sudo apt install -y "$dep"
+        else
+            echo "$dep 已存在"
+        fi
     done
-    sudo systemctl start docker > /dev/null 2>&1
-    sudo systemctl enable docker > /dev/null 2>&1
+
+    sudo systemctl start docker
+    sudo systemctl enable docker
 }
 
 # ===================== 主流程 =====================
