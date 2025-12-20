@@ -93,15 +93,15 @@ trigger_github_actions() {
     echo -e "\033[32m===== 触发 GitHub Actions 读取 Environment Secrets =====\033[0m"
     
     # 获取 Workflow ID（通过文件名查询）
-    WORKFLOW_ID=\$(curl -s -H "Authorization: token $GITHUB_PAT" \
-        "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows" \
-        | jq -r --arg file "$WORKFLOW_FILE" '.workflows[] | select(.path | endswith(\$file)) | .id')
+   WORKFLOW_ID=$(curl -s -H "Authorization: token $GITHUB_PAT" \
+    "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows" \
+    | jq -r --arg file "$WORKFLOW_FILE" '.workflows[] | select(.path | endswith($file)) | .id')
     
     # 调用 workflow_dispatch API 触发工作流
-    RESPONSE=\$(curl -s -X POST \
-        -H "Authorization: token $GITHUB_PAT" \
+    RESPONSE=$(curl -s -X POST \ 
+        -H "Authorization: token $GITHUB_PAT" \ 
         -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows/\$WORKFLOW_ID/dispatches" \
+        "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows/$WORKFLOW_ID/dispatches" \
         -d "{\"ref\":\"main\", \"inputs\": {\"server_ip\": \"$SERVER_IP\"}}")
     
     # 检查触发是否成功
