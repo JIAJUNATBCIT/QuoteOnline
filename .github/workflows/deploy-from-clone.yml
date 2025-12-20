@@ -27,7 +27,6 @@ jobs:
           MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
           SIGN_SECRET: ${{ secrets.SIGN_SECRET }}
         run: |
-          # 构建 JSON 格式的敏感信息
           secrets_payload=$(jq -n -c \
             --arg MONGODB_URI "$MONGODB_URI" \
             --arg JWT_SECRET "$JWT_SECRET" \
@@ -35,11 +34,7 @@ jobs:
             --arg EMAIL_PASS "$EMAIL_PASS" \
             --arg MAILGUN_API_KEY "$MAILGUN_API_KEY" \
             '{"MONGODB_URI":$MONGODB_URI,"JWT_SECRET":$JWT_SECRET,"JWT_REFRESH_SECRET":$JWT_REFRESH_SECRET,"EMAIL_PASS":$EMAIL_PASS,"MAILGUN_API_KEY":$MAILGUN_API_KEY}')
-          
-          # 生成签名
           signature=$(echo -n "$secrets_payload" | openssl dgst -sha256 -hmac "$SIGN_SECRET" | awk '{print $2}')
-          
-          # 写入 GitHub Actions 环境变量
           echo "secrets_payload=$secrets_payload" >> $GITHUB_ENV
           echo "signature=$signature" >> $GITHUB_ENV
 
@@ -57,6 +52,6 @@ jobs:
           /var/www/QuoteOnline/generate-env.sh" > deploy.sh
           chmod +x deploy.sh
 
-          # 上传到服务器并执行
-          sshpass -p "$SERVER_PASS" scp deploy.sh root@$SERVER_IP:/tmp/
-          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no root@$SERVER_IP "bash /tmp/deploy.sh"
+          # 上传到服务器并执行（关闭 host key 检查）
+          sshpass -p "$SERVER_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null deploy.sh root@$SERVER_IP:/tmp/
+          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@$SERVER_IP "bash /tmp/deploy.sh"
