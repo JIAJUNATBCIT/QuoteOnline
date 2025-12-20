@@ -1,7 +1,6 @@
 name: Deploy from Clone (Environment Secrets)
-
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # 支持 API 手动触发
     inputs:
       server_ip:
         description: '生产服务器IP'
@@ -11,20 +10,21 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: production  # 指定使用 production 环境的 Secrets
     steps:
       - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install -y jq openssl sshpass
-
       - name: Prepare sensitive data and signature
         env:
+          # 从 production 环境的 Secrets 读取敏感变量
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
+          # 签名密钥（和服务器脚本中的一致，用于验证）
           SIGN_SECRET: ${{ secrets.SIGN_SECRET }}
         run: |
           # 构建 JSON 格式的敏感信息
@@ -39,35 +39,18 @@ jobs:
           # 生成签名（防止敏感信息被篡改）
           signature=$(echo -n "$secrets_payload" | openssl dgst -sha256 -hmac "$SIGN_SECRET" | awk '{print $2}')
           
-          # 保存到环境变量传递给下一步
-          echo "SECRETS_PAYLOAD=$secrets_payload" >> $GITHUB_ENV
-          echo "SIGNATURE=$signature" >> $GITHUB_ENV
-
-      - name: Upload secrets and run generate-env.sh on server
+          # 传递变量到下一步
+          echo "secrets_payload=$secrets_payload" >> $GITHUB_ENV
+          echo "signature=$signature" >> $GITHUB_ENV
+      - name: Send secrets to server (SSH)
         env:
           SERVER_IP: ${{ github.event.inputs.server_ip }}
-          SERVER_PASS: ${{ secrets.SERVER_PASS }}
-          SECRETS_PAYLOAD: ${{ env.SECRETS_PAYLOAD }}
-          SIGNATURE: ${{ env.SIGNATURE }}
+          SERVER_PASS: ${{ secrets.SERVER_PASS }}  # 服务器 root 密码（存储在 Environment Secrets 中）
+          SECRETS_PAYLOAD: ${{ env.secrets_payload }}
+          SIGNATURE: ${{ env.signature }}
         run: |
-          # 在本地生成临时文件
-          echo "$SECRETS_PAYLOAD" > secrets_payload.json
-          echo "$SIGNATURE" > signature.txt
-
-          # 生成 deploy.sh
-          echo "#!/bin/bash
-          cp /tmp/secrets_payload.json /var/www/QuoteOnline/
-          cp /tmp/signature.txt /var/www/QuoteOnline/
-          /var/www/QuoteOnline/generate-env.sh" > deploy.sh
-          chmod +x deploy.sh
-
-          # 上传文件到服务器
-          sshpass -p "$SERVER_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            secrets_payload.json signature.txt deploy.sh root@$SERVER_IP:/tmp/
-
-          # 执行 deploy.sh
-          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            root@$SERVER_IP "bash /tmp/deploy.sh"
-
-          # 清理本地临时文件
-          rm -f secrets_payload.json signature.txt deploy.sh
+          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no root@$SERVER_IP \
+          "cd /var/www/QuoteOnline && \
+          printf '%s' '$secrets_payload' > /tmp/secrets_payload.json && \
+          printf '%s' '$signature' > /tmp/signature.txt && \
+          ./generate-env.sh"
