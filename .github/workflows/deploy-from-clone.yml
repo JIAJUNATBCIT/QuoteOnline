@@ -51,6 +51,9 @@ jobs:
           SECRETS_PAYLOAD: ${{ env.secrets_payload }}
           SIGNATURE: ${{ env.signature }}
         run: |
-          # 通过 SSH 将敏感信息和签名发送到服务器，并触发 .env 生成
           sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no root@$SERVER_IP \
-            "cd /var/www/QuoteOnline && bash -c 'echo \"$SECRETS_PAYLOAD\" > /tmp/secrets_payload.json && echo \"$SIGNATURE\" > /tmp/signature.txt && ./generate-env.sh'"
+          "cd /var/www/QuoteOnline && \
+          printf '%s' '$secrets_payload' > /tmp/secrets_payload.json && \
+          printf '%s' '$signature' > /tmp/signature.txt && \
+          ./generate-env.sh"
+
