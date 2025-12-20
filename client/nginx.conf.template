@@ -1,13 +1,19 @@
 server {
-    server_name ${DOMAIN} www.${DOMAIN};
+    listen 443 ssl;
+    server_name {{DOMAIN}} www.{{DOMAIN}};
 
-    # 前端静态文件
+    ssl_certificate /etc/letsencrypt/live/{{DOMAIN}}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{DOMAIN}}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
     location / {
-        root /usr/share/nginx/html;
-        index index.html;
         try_files $uri $uri/ /index.html;
 
-        # 静态资源缓存（1年）
+        # 静态资源缓存
         location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
             expires 1y;
             add_header Cache-Control "public, immutable";
@@ -20,7 +26,7 @@ server {
         }
     }
 
-    # API 代理
+    # 后端 API 代理
     location /api/ {
         proxy_pass http://backend:3000/api/;
         proxy_http_version 1.1;
@@ -37,35 +43,19 @@ server {
         proxy_read_timeout 60s;
     }
 
-    # 健康检查
     location /health {
         access_log off;
         return 200 "healthy\n";
         add_header Content-Type text/plain;
     }
 
-    # 日志
-    access_log /var/log/nginx/${DOMAIN}.access.log;
-    error_log /var/log/nginx/${DOMAIN}.error.log;
-
-    # SSL
-    listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers off;
+    access_log /var/log/nginx/{{DOMAIN}}.access.log;
+    error_log /var/log/nginx/{{DOMAIN}}.error.log;
 }
 
 server {
-    if ($host = www.${DOMAIN}) {
-        return 301 https://$host$request_uri;
-    }
-    if ($host = ${DOMAIN}) {
-        return 301 https://$host$request_uri;
-    }
-
     listen 80;
-    server_name ${DOMAIN} www.${DOMAIN};
-    return 404;
+    server_name {{DOMAIN}} www.{{DOMAIN}};
+
+    return 301 https://$host$request_uri;
 }
