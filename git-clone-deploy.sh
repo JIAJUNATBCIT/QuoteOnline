@@ -143,6 +143,11 @@ main() {
     done
     echo ".env 文件生成完成"
 
+    echo "生成 nginx.conf(基于模板)..."
+    sed "s/{{DOMAIN}}/$DOMAIN/g" \
+    $PROJECT_DIR/client/nginx.conf.template \
+    > $PROJECT_DIR/client/nginx.conf
+
     echo -e "\033[32m===== 启动 Docker 服务 =====\033[0m"
     cd "$PROJECT_DIR"
     cp ./client/src/environments/environment.prod.ts ./client/environment.ts
