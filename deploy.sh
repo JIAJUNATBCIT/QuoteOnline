@@ -7,7 +7,6 @@ GITHUB_REPO="QuoteOnline"
 ENV_NAME="production"
 PROJECT_DIR="/var/www/QuoteOnline"
 WORKFLOW_FILE="deploy-from-clone.yml"
-SIGN_SECRET='Husar2pawiaO284872'
 
 # ===================== 交互式输入 ======================
 read -s -p "请输入 GitHub PAT (必须有 repo + workflow 权限): " GITHUB_PAT
