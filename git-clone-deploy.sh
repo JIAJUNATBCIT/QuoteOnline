@@ -91,29 +91,25 @@ EOF
 # ===================== 工具函数：调用 GitHub API 触发 Actions =====================
 trigger_github_actions() {
     echo -e "\033[32m===== 触发 GitHub Actions 读取 Environment Secrets =====\033[0m"
-    
-    # 获取 Workflow ID（通过文件名查询）
-   WORKFLOW_ID=$(curl -s -H "Authorization: token $GITHUB_PAT" \
-    "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows" \
-    | jq -r --arg file "$WORKFLOW_FILE" '.workflows[] | select(.path | endswith($file)) | .id')
-    
-    # 调用 workflow_dispatch API 触发工作流
-    RESPONSE=$(curl -s -X POST \ 
-        -H "Authorization: token $GITHUB_PAT" \ 
-        -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows/$WORKFLOW_ID/dispatches" \
-        -d "{\"ref\":\"main\", \"inputs\": {\"server_ip\": \"$SERVER_IP\"}}")
-    
-    # 检查触发是否成功
-    if [ -z "\$RESPONSE" ]; then
-        echo -e "GitHub Actions 触发成功，等待敏感信息传递..."
-    else
-        echo -e "\033[31m【错误】触发 GitHub Actions 失败：\$RESPONSE\033[0m"
+
+    WORKFLOW_ID=$(curl -s \
+        -H "Authorization: token $GITHUB_PAT" \
+        https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows \
+        | jq -r --arg file "$WORKFLOW_FILE" '.workflows[] | select(.path | endswith($file)) | .id'
+    )
+
+    if [ -z "$WORKFLOW_ID" ]; then
+        echo -e "\033[31m【错误】未找到 workflow：$WORKFLOW_FILE\033[0m"
         exit 1
     fi
 
-    # 等待 Actions 完成（可选，轮询检查工作流状态）
-    sleep 10  # 等待 10 秒，让 Actions 完成敏感信息传递
+    curl -s -X POST \
+        -H "Authorization: token $GITHUB_PAT" \
+        -H "Accept: application/vnd.github.v3+json" \
+        "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows/$WORKFLOW_ID/dispatches" \
+        -d "$(jq -nc --arg ip "$SERVER_IP" '{ref:"main", inputs:{server_ip:$ip}}')"
+
+    echo "GitHub Actions 已成功触发"
 }
 
 # ===================== 工具函数：安装依赖 =====================
