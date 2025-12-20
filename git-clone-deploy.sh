@@ -1,9 +1,14 @@
 #!/bin/bash
 set -e
 
-# ===================== 用户输入 =====================
-read -p "请输入 GitHub PAT: " GITHUB_PAT
-read -p "请输入部署域名 (例如 portal.ooishipping.com): " DOMAIN
+# ===================== 交互式输入 =====================
+if [ -z "$GITHUB_PAT" ]; then
+    read -rp "请输入 GitHub PAT（用于访问仓库和触发 Actions）: " GITHUB_PAT
+fi
+
+if [ -z "$DOMAIN" ]; then
+    read -rp "请输入部署域名（例如 portal.ooishipping.com）: " DOMAIN
+fi
 
 # ===================== 配置项 =====================
 GITHUB_USERNAME="JIAJUNATBCIT"
