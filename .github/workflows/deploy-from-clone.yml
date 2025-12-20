@@ -29,7 +29,7 @@ jobs:
           SIGN_SECRET: ${{ secrets.SIGN_SECRET }}
         run: |
           # 构建 JSON 格式的敏感信息
-          secrets_payload=$(jq -n \
+          secrets_payload=$(jq -n -c \
             --arg MONGODB_URI "$MONGODB_URI" \
             --arg JWT_SECRET "$JWT_SECRET" \
             --arg JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET" \
