@@ -50,7 +50,9 @@ services:
 
   # 2. Nginx服务（前端+代理+HTTPS）
   nginx:
-    build: ./nginx  # 基于nginx目录Dockerfile构建
+    build:
+      context: ./client           # 前端源码目录
+      dockerfile: ../nginx/Dockerfile   # 指向 nginx/Dockerfile
     depends_on:
       - backend
     volumes:

@@ -21,7 +21,8 @@ FROM nginx:alpine as production-stage
 COPY --from=build-stage /app/dist/quote-online-client /usr/share/nginx/html
 
 # 复制自定义Nginx配置（替换容器默认配置）
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# nginx.conf 位于 build context 外，要改成 COPY 时相对 build context 的路径
+COPY ../nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
 # 设置静态文件权限（解决Linux权限问题）
 RUN chmod -R 755 /usr/share/nginx/html
