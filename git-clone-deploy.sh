@@ -141,8 +141,11 @@ main() {
         exit 1
     fi
 
-    # 2. 安装依赖
+    # 2.1 安装依赖
     install_dependencies
+    # 2.2 安装Certbot
+    sudo apt install certbot -y
+    sudo apt install python3-certbot-nginx -y
 
     # 3. 自动创建 generate-env.sh 脚本（核心：无需手动创建）
     create_generate_env_script
@@ -181,7 +184,18 @@ main() {
         echo -e "Docker 容器启动成功！"
     fi
 
-    # 7. 部署完成
+    # 7. 安装证书
+    sudo docker-compose stop nginx
+    sudo certbot certonly --standalone -d portal.ooishipping.com -d www.portal.ooishipping.com \
+        --non-interactive --agree-tos --register-unsafely-without-email
+
+    # 8. 设置自动续期 cron
+    (crontab -l 2>/dev/null; echo "0 0,12 * * * /usr/bin/certbot renew --quiet && /usr/bin/docker-compose -f $PROJECT_DIR/docker-compose.yml restart nginx") | crontab -
+
+    # 9. 重启服务
+    sudo docker-compose start nginx
+
+    # 10. 部署完成
     echo -e "\033[32m===== 全量部署完成！=====\033[0m"
     echo -e "项目目录：$PROJECT_DIR"
     echo -e "可通过 docker ps 查看容器状态，或 cat $PROJECT_DIR/.env 查看敏感信息"
