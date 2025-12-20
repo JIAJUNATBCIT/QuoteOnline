@@ -1,43 +1,20 @@
 #!/bin/bash
 set -e
 
-# ===================== 交互式输入 =====================
-if [ -z "$GITHUB_PAT" ]; then
-    read -rp "请输入 GitHub Personal Access Token(PAT): " GITHUB_PAT
-fi
+# ===================== 用户输入 =====================
+read -p "请输入 GitHub PAT: " GITHUB_PAT
+read -p "请输入部署域名 (例如 portal.ooishipping.com): " DOMAIN
 
-if [ -z "$DOMAIN" ]; then
-    read -rp "请输入部署域名(例如 portal.ooishipping.com): " DOMAIN
-fi
-
-# ===================== 固定配置项 =====================
+# ===================== 配置项 =====================
 GITHUB_USERNAME="JIAJUNATBCIT"
 GITHUB_REPO="QuoteOnline"
 ENV_NAME="production"
 PROJECT_DIR="/var/www/QuoteOnline"
+SERVER_IP=$(curl -s ifconfig.me)
 WORKFLOW_FILE="deploy-from-clone.yml"
 SIGN_SECRET="Jicladie2&#fjoCK!("
 
-# ===================== 工具函数：安装依赖 =====================
-install_dependencies() {
-    echo -e "\033[32m===== 安装必需依赖 =====\033[0m"
-    sudo apt update -y
-
-    DEPS=("git" "jq" "openssl" "docker.io" "docker-compose" "curl" "certbot" "python3-certbot-nginx")
-    for dep in "${DEPS[@]}"; do
-        if ! command -v "$dep" &> /dev/null; then
-            echo "安装 $dep ..."
-            sudo apt install -y "$dep"
-        else
-            echo "$dep 已存在"
-        fi
-    done
-
-    sudo systemctl start docker
-    sudo systemctl enable docker
-}
-
-# ===================== 工具函数：创建 generate-env.sh =====================
+# ===================== 创建 generate-env.sh =====================
 create_generate_env_script() {
     echo -e "\033[32m===== 自动创建 generate-env.sh 脚本 =====\033[0m"
     mkdir -p "$PROJECT_DIR"
@@ -94,29 +71,40 @@ echo -e "\033[32m===== .env 文件生成成功 =====\033[0m"
 EOF
 
     chmod +x "$PROJECT_DIR/generate-env.sh"
-    echo -e "generate-env.sh 脚本已创建并赋予执行权限：$PROJECT_DIR/generate-env.sh"
+    echo -e "generate-env.sh 已创建：$PROJECT_DIR/generate-env.sh"
 }
 
-# ===================== 工具函数：替换 nginx.conf 中的域名 =====================
+# ===================== 更新 nginx.conf =====================
 update_nginx_conf() {
-    echo -e "\033[32m===== 更新 nginx.conf 中的域名 =====\033[0m"
-    NGINX_CONF="$PROJECT_DIR/client/nginx.conf"
-    if [ -f "$NGINX_CONF" ]; then
-        sed -i "s/portal.ooishipping.com/$DOMAIN/g" "$NGINX_CONF"
-        echo "nginx.conf 域名已更新为 $DOMAIN"
-    else
-        echo -e "\033[31m【错误】未找到 nginx.conf 文件: $NGINX_CONF\033[0m"
-        exit 1
-    fi
+    echo -e "\033[32m===== 替换 nginx.conf 域名 =====\033[0m"
+    sed "s|\${DOMAIN}|$DOMAIN|g" "$PROJECT_DIR/client/nginx.conf.template" > "$PROJECT_DIR/client/nginx.conf"
 }
 
-# ===================== 工具函数：触发 GitHub Actions =====================
+# ===================== 安装依赖 =====================
+install_dependencies() {
+    echo -e "\033[32m===== 安装必需依赖 =====\033[0m"
+    sudo apt update -y
+    DEPS=("git" "jq" "openssl" "docker.io" "docker-compose" "curl" "certbot" "python3-certbot-nginx")
+    for dep in "${DEPS[@]}"; do
+        if ! command -v "$dep" &> /dev/null; then
+            echo "安装 $dep ..."
+            sudo apt install -y "$dep"
+        else
+            echo "$dep 已存在"
+        fi
+    done
+    sudo systemctl start docker
+    sudo systemctl enable docker
+}
+
+# ===================== GitHub Actions =====================
 trigger_github_actions() {
-    echo -e "\033[32m===== 触发 GitHub Actions 获取 Environment Secrets =====\033[0m"
+    echo -e "\033[32m===== 触发 GitHub Actions 获取 Secrets =====\033[0m"
     WORKFLOW_ID=$(curl -s \
         -H "Authorization: token $GITHUB_PAT" \
         https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows \
-        | jq -r --arg file "$WORKFLOW_FILE" '.workflows[] | select(.path | endswith($file)) | .id')
+        | jq -r --arg file "$WORKFLOW_FILE" '.workflows[] | select(.path | endswith($file)) | .id'
+    )
 
     if [ -z "$WORKFLOW_ID" ]; then
         echo -e "\033[31m【错误】未找到 workflow：$WORKFLOW_FILE\033[0m"
@@ -127,7 +115,7 @@ trigger_github_actions() {
         -H "Authorization: token $GITHUB_PAT" \
         -H "Accept: application/vnd.github.v3+json" \
         "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows/$WORKFLOW_ID/dispatches" \
-        -d "$(jq -nc --arg ip "$(curl -s ifconfig.me)" '{ref:"main", inputs:{server_ip:$ip}}')"
+        -d "$(jq -nc --arg ip "$SERVER_IP" '{ref:"main", inputs:{server_ip:$ip}}')"
 
     echo "GitHub Actions 已成功触发"
 }
@@ -136,35 +124,36 @@ trigger_github_actions() {
 main() {
     install_dependencies
     create_generate_env_script
-    update_nginx_conf
 
-    # 克隆/更新代码
+    # 克隆或更新代码
     echo -e "\033[32m===== 克隆/更新代码仓库 =====\033[0m"
     mkdir -p "$(dirname "$PROJECT_DIR")"
     if [ -d "$PROJECT_DIR/.git" ]; then
-        cd "$PROJECT_DIR"
-        git pull origin main
+        cd "$PROJECT_DIR" && git pull origin main
     else
         rm -rf "$PROJECT_DIR"
         git clone "https://github.com/$GITHUB_USERNAME/$GITHUB_REPO.git" "$PROJECT_DIR"
     fi
 
-    # 获取 Environment Secrets
+    # 触发 GitHub Actions 获取 .env
     trigger_github_actions
     echo "等待 .env 文件生成..."
     while [ ! -f "$PROJECT_DIR/.env" ]; do sleep 2; done
     echo ".env 文件生成完成"
 
-    # 启动 Docker
+    # 替换 nginx.conf 中的域名
+    update_nginx_conf
+
+    # 启动服务
     echo -e "\033[32m===== 启动 Docker 服务 =====\033[0m"
     cd "$PROJECT_DIR"
-    cp ./client/src/environments/environment.prod.ts ./client/environment.ts || true
+    cp ./client/src/environments/environment.prod.ts ./client/environment.ts
     sudo docker-compose up -d --build
 
-    # 安装证书
+    # 安装 SSL 证书
+    echo -e "\033[32m===== 安装 SSL 证书 =====\033[0m"
     sudo docker-compose stop nginx
-    sudo certbot certonly --standalone -d "$DOMAIN" -d "www.$DOMAIN" \
-        --non-interactive --agree-tos --register-unsafely-without-email
+    sudo certbot certonly --standalone -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos --register-unsafely-without-email
 
     # 设置自动续期
     (crontab -l 2>/dev/null; echo "0 0,12 * * * /usr/bin/certbot renew --quiet && /usr/bin/docker-compose -f $PROJECT_DIR/docker-compose.yml restart nginx") | crontab -
@@ -173,9 +162,8 @@ main() {
     sudo docker-compose start nginx
 
     echo -e "\033[32m===== 全量部署完成！=====\033[0m"
-    echo -e "项目目录：$PROJECT_DIR"
-    echo -e "可通过 docker ps 查看容器状态，或 cat $PROJECT_DIR/.env 查看敏感信息"
+    echo "项目目录：$PROJECT_DIR"
+    echo "可通过 docker ps 查看容器状态"
 }
 
-# 执行主流程
 main
