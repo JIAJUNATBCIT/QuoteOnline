@@ -44,16 +44,16 @@ jobs:
           echo "secrets_payload=$secrets_payload" >> $GITHUB_ENV
           echo "signature=$signature" >> $GITHUB_ENV
 
-      - name: Send secrets to server (SSH)
-        env:
-          SERVER_IP: ${{ github.event.inputs.server_ip }}
-          SERVER_PASS: ${{ secrets.SERVER_PASS }}  # 服务器 root 密码（存储在 Environment Secrets 中）
-          SECRETS_PAYLOAD: ${{ env.secrets_payload }}
-          SIGNATURE: ${{ env.signature }}
-        run: |
-          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no root@$SERVER_IP \
-          "cd /var/www/QuoteOnline && \
-          printf '%s' '$secrets_payload' > /tmp/secrets_payload.json && \
-          printf '%s' '$signature' > /tmp/signature.txt && \
-          ./generate-env.sh"
+          - name: Send secrets to server (SSH)
+            env:
+              SERVER_IP: ${{ github.event.inputs.server_ip }}
+              SERVER_PASS: ${{ secrets.SERVER_PASS }}
+              SECRETS_PAYLOAD: ${{ env.secrets_payload }}
+              SIGNATURE: ${{ env.signature }}
+            run: |
+              sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no root@$SERVER_IP \
+              "cd /var/www/QuoteOnline && \
+              printf '%s' '$SECRETS_PAYLOAD' > /tmp/secrets_payload.json && \
+              printf '%s' '$SIGNATURE' > /tmp/signature.txt && \
+              ./generate-env.sh"
 
