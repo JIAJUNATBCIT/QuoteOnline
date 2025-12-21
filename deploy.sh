@@ -277,12 +277,14 @@ log_info "SSL证书申请成功"
 
 # ===== 步骤5：覆盖生成 HTTPS 配置（直接写入 nginx.conf）=====
 log_info "生成正式HTTPS配置（覆盖 nginx.conf）..."
-# 先创建 options-ssl-nginx.conf 文件（宿主机），确保容器能挂载到
-SSL_CONF="/etc/letsencrypt/options-ssl-nginx.conf"
-if [ ! -f "$SSL_CONF" ]; then
-    log_info "创建缺失的 SSL 优化配置文件：$SSL_CONF"
+
+# --------------- 修复1：创建缺失的SSL相关文件 ---------------
+# 1. 创建 options-ssl-nginx.conf
+SSL_OPTIONS_CONF="/etc/letsencrypt/options-ssl-nginx.conf"
+if [ ! -f "$SSL_OPTIONS_CONF" ]; then
+    log_info "创建缺失的 SSL 优化配置文件：$SSL_OPTIONS_CONF"
     sudo mkdir -p /etc/letsencrypt
-    cat > "$SSL_CONF" << EOF
+    cat > "$SSL_OPTIONS_CONF" << EOF
 ssl_session_cache shared:SSL:10m;
 ssl_session_timeout 10m;
 ssl_protocols TLSv1.2 TLSv1.3;
@@ -291,11 +293,23 @@ ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECD
 EOF
 fi
 
+# 2. 创建 ssl-dhparams.pem（用OpenSSL生成，若不存在）
+SSL_DHPARAMS_CONF="/etc/letsencrypt/ssl-dhparams.pem"
+if [ ! -f "$SSL_DHPARAMS_CONF" ]; then
+    log_info "创建缺失的 DH 参数文件：$SSL_DHPARAMS_CONF（生成可能需要1-2分钟）"
+    # 生成2048位的DH参数（速度快，兼顾安全），若需更高安全可改为4096（耗时更长）
+    sudo openssl dhparam -out "$SSL_DHPARAMS_CONF" 2048 > /dev/null 2>&1
+fi
+
+# --------------- 修复2：处理模板中的引用 ---------------
 if [ -f "$NGINX_TEMPLATE" ]; then
-    # 核心：替换模板中的 options-ssl-nginx.conf 引用（注释掉或删除）
-    sed -e "s|include /etc/letsencrypt/options-ssl-nginx.conf;|# include /etc/letsencrypt/options-ssl-nginx.conf;|g" -e "s/{{DOMAIN}}/$DOMAIN/g" "$NGINX_TEMPLATE" > "$NGINX_CONF"
+    # 核心：注释模板中的 options-ssl-nginx.conf 和 ssl-dhparams.pem 引用
+    sed -e "s|include /etc/letsencrypt/options-ssl-nginx.conf;|# include /etc/letsencrypt/options-ssl-nginx.conf;|g" \
+        -e "s|ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;|# ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;|g" \
+        -e "s/{{DOMAIN}}/$DOMAIN/g" \
+        "$NGINX_TEMPLATE" > "$NGINX_CONF"
 else
-    # 生成默认HTTPS配置（无该引用）
+    # 生成默认HTTPS配置（内置SSL配置，不依赖外部文件）
     cat > "$NGINX_CONF" << EOF
 server {
     listen 80;
@@ -307,19 +321,24 @@ server {
     listen 443 ssl http2;
     server_name $DOMAIN;
 
+    # SSL证书配置
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 
-    # 直接内置SSL优化配置，不再引用外部文件
+    # 内置SSL优化配置（无需外部文件）
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
     ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384";
+    # 若需要DH参数，可取消注释（文件已生成）
+    # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
+    # 静态文件配置
     root /usr/share/nginx/html;
     index index.html index.htm;
 
+    # 反向代理后端
     location /api/ {
         proxy_pass http://quoteonline-backend-1:3000;
         proxy_set_header Host \$host;
@@ -328,6 +347,7 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
+    # Angular单页应用路由
     location / {
         try_files \$uri \$uri/ /index.html;
     }
