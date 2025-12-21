@@ -6,6 +6,9 @@ on:
       server_ip:
         required: true
         type: string
+      github_pat:  # 添加PAT输入，用于克隆仓库
+        required: true
+        type: string
 
 jobs:
   deploy:
@@ -13,27 +16,50 @@ jobs:
     environment: production
 
     steps:
-      - name: Generate .env
-        run: |
-          cat > .env <<EOF
-          NODE_ENV=production
-          PORT=3000
-          MONGODB_URI=${{ secrets.MONGODB_URI }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-          EMAIL_PASS=${{ secrets.EMAIL_PASS }}
-          MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
-          EOF
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Upload and deploy
+      - name: Upload script and deploy
         env:
           SERVER_IP: ${{ github.event.inputs.server_ip }}
           SERVER_PASS: ${{ secrets.SERVER_PASS }}
+          # 传递敏感secrets作为环境变量
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
+          # 传递非敏感变量
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          EMAIL_HOST: ${{ vars.EMAIL_HOST }}
+          EMAIL_PORT: ${{ vars.EMAIL_PORT }}
+          ENABLE_QUOTE_EMAIL_NOTIFICATIONS: ${{ vars.ENABLE_QUOTE_EMAIL_NOTIFICATIONS }}
+          MAILGUN_DOMAIN: ${{ vars.MAILGUN_DOMAIN }}
+          GITHUB_PAT: ${{ github.event.inputs.github_pat }}
+          GITHUB_USERNAME: "JIAJUNATBCIT"
+          GITHUB_REPO: "QuoteOnline"
         run: |
+          # 上传部署脚本到服务器
           sshpass -p "$SERVER_PASS" scp -o StrictHostKeyChecking=no \
-            .env docker-compose.yml \
+            deploy.sh docker-compose.yml \
             root@$SERVER_IP:/var/www/QuoteOnline/
 
+          # 通过环境变量传递所有参数给远程脚本并执行
           sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no \
             root@$SERVER_IP \
-            "cd /var/www/QuoteOnline && docker compose up -d --build"
+            "export MONGODB_URI='$MONGODB_URI' && \
+             export JWT_SECRET='$JWT_SECRET' && \
+             export JWT_REFRESH_SECRET='$JWT_REFRESH_SECRET' && \
+             export EMAIL_PASS='$EMAIL_PASS' && \
+             export MAILGUN_API_KEY='$MAILGUN_API_KEY' && \
+             export EMAIL_FROM='$EMAIL_FROM' && \
+             export EMAIL_HOST='$EMAIL_HOST' && \
+             export EMAIL_PORT='$EMAIL_PORT' && \
+             export ENABLE_QUOTE_EMAIL_NOTIFICATIONS='$ENABLE_QUOTE_EMAIL_NOTIFICATIONS' && \
+             export MAILGUN_DOMAIN='$MAILGUN_DOMAIN' && \
+             export GITHUB_PAT='$GITHUB_PAT' && \
+             export GITHUB_USERNAME='$GITHUB_USERNAME' && \
+             export GITHUB_REPO='$GITHUB_REPO' && \
+             cd /var/www/QuoteOnline && \
+             chmod +x deploy.sh && \
+             ./deploy.sh"
