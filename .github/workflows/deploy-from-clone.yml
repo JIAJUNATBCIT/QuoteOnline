@@ -6,101 +6,58 @@ on:
       server_ip:
         required: true
         type: string
-      github_pat:  # 接收从 deploy.sh 传递的 PAT
+      domain:
         required: true
         type: string
-      domain:  # 接收从 deploy.sh 传递的域名
+      github_pat:
         required: true
         type: string
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: production  # 关联 GitHub 环境（secrets/vars 所在环境）
 
     steps:
-      - name: Checkout 代码（可选，如需使用仓库内的脚本）
-        uses: actions/checkout@v4
-
-      - name: 生成 .env 文件（包含敏感信息和域名）
+      - name: 生成完整的 .env 文件（敏感+非敏感信息）
         run: |
           cat > .env <<EOF
+          # 基础配置
           NODE_ENV=production
           PORT=3000
-          FRONTEND_URL=https://${{ github.event.inputs.domain }}  # 使用传递的域名
+          FRONTEND_URL=https://${{ github.event.inputs.domain }}
           UPLOAD_PATH=./uploads
           MAX_FILE_SIZE=10485760
+
+          # 敏感信息（从 GitHub Environment Secrets 读取）
           MONGODB_URI=${{ secrets.MONGODB_URI }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
           EMAIL_PASS=${{ secrets.EMAIL_PASS }}
           MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
+          SERVER_PASS=${{ secrets.SERVER_PASS }}
+
+          # 非敏感信息（从 GitHub Environment Variables 读取）
+          EMAIL_FROM=${{ vars.EMAIL_FROM }}
+          EMAIL_HOST=${{ vars.EMAIL_HOST }}
+          EMAIL_PORT=${{ vars.EMAIL_PORT }}
+          ENABLE_QUOTE_EMAIL_NOTIFICATIONS=${{ vars.ENABLE_QUOTE_EMAIL_NOTIFICATIONS }}
+          MAILGUN_DOMAIN=${{ vars.MAILGUN_DOMAIN }}
           EOF
 
-      - name: 上传文件并部署到服务器
+      - name: 上传完整的 .env 到服务器
         env:
           SERVER_IP: ${{ github.event.inputs.server_ip }}
-          SERVER_PASS: ${{ secrets.SERVER_PASS }}  # 服务器密码从 GitHub Secrets 获取
-          GITHUB_PAT: ${{ github.event.inputs.github_pat }}
-          GITHUB_USERNAME: "JIAJUNATBCIT"
-          GITHUB_REPO: "QuoteOnline"
-          DOMAIN: ${{ github.event.inputs.domain }}
+          SERVER_PASS: ${{ secrets.SERVER_PASS }}
+          PROJECT_DIR: "/var/www/QuoteOnline"
         run: |
-          # 上传 .env、docker-compose.yml 到服务器
+          # 安装 sshpass（用于密码登录）
+          apt update -y && apt install -y sshpass
+
+          # 上传 .env 到服务器项目目录（覆盖原有文件）
           sshpass -p "$SERVER_PASS" scp -o StrictHostKeyChecking=no \
-            .env docker-compose.yml \
-            root@$SERVER_IP:/var/www/QuoteOnline/
+            .env root@$SERVER_IP:$PROJECT_DIR/
 
-          # 通过 SSH 执行服务器部署命令（安装依赖、克隆代码、启动服务等）
-          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no \
-            root@$SERVER_IP \
-            "export GITHUB_PAT='$GITHUB_PAT' && \
-             export GITHUB_USERNAME='$GITHUB_USERNAME' && \
-             export GITHUB_REPO='$GITHUB_REPO' && \
-             export DOMAIN='$DOMAIN' && \
-             cd /var/www/QuoteOnline && \
-             # 安装系统依赖
-             apt update -y && \
-             DEPS=('git' 'curl' 'jq' 'openssl' 'docker.io' 'certbot') && \
-             for dep in \"\${DEPS[@]}\"; do \
-               if ! command -v \"\$dep\" &>/dev/null; then \
-                 apt install -y \"\$dep\"; \
-               fi; \
-             done && \
-             systemctl enable docker && \
-             systemctl start docker && \
-             # 安装 Docker Compose
-             if ! docker compose version &>/dev/null; then \
-               mkdir -p /usr/local/lib/docker/cli-plugins && \
-               curl -SL https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64 \
-                 -o /usr/local/lib/docker/cli-plugins/docker-compose && \
-               chmod +x /usr/local/lib/docker/cli-plugins/docker-compose; \
-             fi && \
-             # 克隆/更新代码（使用 PAT 访问私有仓库）
-             if [ -d \"/var/www/QuoteOnline/.git\" ]; then \
-               cd /var/www/QuoteOnline && git pull origin main; \
-             else \
-               rm -rf /var/www/QuoteOnline && \
-               git clone https://\$GITHUB_USERNAME:\$GITHUB_PAT@github.com/\$GITHUB_USERNAME/\$GITHUB_REPO.git /var/www/QuoteOnline; \
-             fi && \
-             # 配置 Nginx
-             TEMPLATE=\"/var/www/QuoteOnline/client/nginx.conf.template\" && \
-             NGINX_CONF=\"/var/www/QuoteOnline/client/nginx.conf\" && \
-             if [ ! -f \"\$TEMPLATE\" ]; then \
-               echo \"找不到 nginx.conf.template\"; exit 1; \
-             fi && \
-             sed \"s/{{DOMAIN}}/\$DOMAIN/g\" \$TEMPLATE > \$NGINX_CONF && \
-             # 启动服务并配置 SSL
-             docker compose up -d --build && \
-             docker compose stop nginx && \
-             certbot certonly --standalone -d \$DOMAIN --non-interactive --agree-tos --register-unsafely-without-email && \
-             # 配置 SSL 自动续期
-             (crontab -l 2>/dev/null; echo \"0 3 * * * certbot renew --quiet && docker compose -f /var/www/QuoteOnline/docker-compose.yml restart nginx\") | crontab - && \
-             docker compose start nginx"
-
-      - name: 部署完成提示
-        run: |
-          echo "======================================"
-          echo "🎉 部署完成"
-          echo "🌍 访问地址: https://${{ github.event.inputs.domain }}"
-          echo "======================================"
+          # 执行服务器端的后续操作（如重启服务）
+          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no root@$SERVER_IP \
+            "cd $PROJECT_DIR && docker compose restart"
