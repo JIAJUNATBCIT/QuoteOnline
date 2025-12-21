@@ -277,10 +277,25 @@ log_info "SSL证书申请成功"
 
 # ===== 步骤5：覆盖生成 HTTPS 配置（直接写入 nginx.conf）=====
 log_info "生成正式HTTPS配置（覆盖 nginx.conf）..."
+# 先创建 options-ssl-nginx.conf 文件（宿主机），确保容器能挂载到
+SSL_CONF="/etc/letsencrypt/options-ssl-nginx.conf"
+if [ ! -f "$SSL_CONF" ]; then
+    log_info "创建缺失的 SSL 优化配置文件：$SSL_CONF"
+    sudo mkdir -p /etc/letsencrypt
+    cat > "$SSL_CONF" << EOF
+ssl_session_cache shared:SSL:10m;
+ssl_session_timeout 10m;
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_prefer_server_ciphers on;
+ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384";
+EOF
+fi
+
 if [ -f "$NGINX_TEMPLATE" ]; then
-    sed "s/{{DOMAIN}}/$DOMAIN/g" "$NGINX_TEMPLATE" > "$NGINX_CONF"
+    # 核心：替换模板中的 options-ssl-nginx.conf 引用（注释掉或删除）
+    sed -e "s|include /etc/letsencrypt/options-ssl-nginx.conf;|# include /etc/letsencrypt/options-ssl-nginx.conf;|g" -e "s/{{DOMAIN}}/$DOMAIN/g" "$NGINX_TEMPLATE" > "$NGINX_CONF"
 else
-    # 生成默认HTTPS配置
+    # 生成默认HTTPS配置（无该引用）
     cat > "$NGINX_CONF" << EOF
 server {
     listen 80;
@@ -295,7 +310,7 @@ server {
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 
-    # SSL优化配置
+    # 直接内置SSL优化配置，不再引用外部文件
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     ssl_protocols TLSv1.2 TLSv1.3;
