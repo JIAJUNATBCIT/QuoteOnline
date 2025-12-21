@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       server_ip:
-        description: '生产服务器 IP'
+        description: "生产服务器 IP"
         required: true
         type: string
 
@@ -19,7 +19,7 @@ jobs:
           sudo apt update
           sudo apt install -y jq openssl sshpass
 
-      - name: Build secrets payload and signature
+      - name: Prepare secrets payload and signature
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -30,7 +30,6 @@ jobs:
         run: |
           set -e
 
-          echo "▶ 构建 secrets payload..."
           jq -n -c \
             --arg MONGODB_URI "$MONGODB_URI" \
             --arg JWT_SECRET "$JWT_SECRET" \
@@ -45,37 +44,30 @@ jobs:
               MAILGUN_API_KEY: $MAILGUN_API_KEY
             }' > secrets_payload.json
 
-          echo "▶ 生成签名..."
           openssl dgst -sha256 -hmac "$SIGN_SECRET" secrets_payload.json \
             | awk '{print $2}' > signature.txt
 
-          echo "▶ 本地文件确认："
-          ls -l secrets_payload.json signature.txt
-
-      - name: Upload secrets & run generate-env.sh on server
+      - name: Upload secrets and run generate-env.sh on server
         env:
           SERVER_IP: ${{ github.event.inputs.server_ip }}
           SERVER_PASS: ${{ secrets.SERVER_PASS }}
         run: |
           set -e
 
-          echo "▶ 上传 secrets 到服务器..."
           sshpass -p "$SERVER_PASS" scp \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             secrets_payload.json signature.txt \
             root@$SERVER_IP:/tmp/
 
-          echo "▶ 远程执行 generate-env.sh..."
           sshpass -p "$SERVER_PASS" ssh \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
-            root@$SERVER_IP <<'EOF'
-              set -e
-              ls -l /tmp/secrets_payload.json /tmp/signature.txt
-              cd /var/www/QuoteOnline
-              ./generate-env.sh
-EOF
+            root@$SERVER_IP \
+            "cp /tmp/secrets_payload.json /tmp/signature.txt /var/www/QuoteOnline/ && \
+             cd /var/www/QuoteOnline && \
+             ./generate-env.sh"
 
-          echo "▶ 清理 runner 临时文件"
+      - name: Cleanup local temp files
+        run: |
           rm -f secrets_payload.json signature.txt
