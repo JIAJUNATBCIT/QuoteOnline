@@ -1,0 +1,81 @@
+name: Deploy from Clone (Environment Secrets)
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_ip:
+        description: '生产服务器 IP'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y jq openssl sshpass
+
+      - name: Build secrets payload and signature
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
+          SIGN_SECRET: ${{ secrets.SIGN_SECRET }}
+        run: |
+          set -e
+
+          echo "▶ 构建 secrets payload..."
+          jq -n -c \
+            --arg MONGODB_URI "$MONGODB_URI" \
+            --arg JWT_SECRET "$JWT_SECRET" \
+            --arg JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET" \
+            --arg EMAIL_PASS "$EMAIL_PASS" \
+            --arg MAILGUN_API_KEY "$MAILGUN_API_KEY" \
+            '{
+              MONGODB_URI: $MONGODB_URI,
+              JWT_SECRET: $JWT_SECRET,
+              JWT_REFRESH_SECRET: $JWT_REFRESH_SECRET,
+              EMAIL_PASS: $EMAIL_PASS,
+              MAILGUN_API_KEY: $MAILGUN_API_KEY
+            }' > secrets_payload.json
+
+          echo "▶ 生成签名..."
+          openssl dgst -sha256 -hmac "$SIGN_SECRET" secrets_payload.json \
+            | awk '{print $2}' > signature.txt
+
+          echo "▶ 本地文件确认："
+          ls -l secrets_payload.json signature.txt
+
+      - name: Upload secrets & run generate-env.sh on server
+        env:
+          SERVER_IP: ${{ github.event.inputs.server_ip }}
+          SERVER_PASS: ${{ secrets.SERVER_PASS }}
+        run: |
+          set -e
+
+          echo "▶ 上传 secrets 到服务器..."
+          sshpass -p "$SERVER_PASS" scp \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            secrets_payload.json signature.txt \
+            root@$SERVER_IP:/tmp/
+
+          echo "▶ 远程执行 generate-env.sh..."
+          sshpass -p "$SERVER_PASS" ssh \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            root@$SERVER_IP <<'EOF'
+              set -e
+              ls -l /tmp/secrets_payload.json /tmp/signature.txt
+              cd /var/www/QuoteOnline
+              ./generate-env.sh
+EOF
+
+          echo "▶ 清理 runner 临时文件"
+          rm -f secrets_payload.json signature.txt
