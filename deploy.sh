@@ -7,6 +7,8 @@ GITHUB_REPO="QuoteOnline"
 ENV_NAME="production"
 PROJECT_DIR="/var/www/QuoteOnline"
 WORKFLOW_FILE="deploy-from-clone.yml"
+# 新增：生成随机的 SIGN_SECRET（32位十六进制字符串）
+SIGN_SECRET=$(openssl rand -hex 32)
 
 # ===================== 交互式输入 ======================
 read -s -p "请输入 GitHub PAT (必须有 repo + workflow 权限): " GITHUB_PAT
@@ -113,11 +115,18 @@ trigger_github_actions() {
 
     [ -z "$WORKFLOW_ID" ] && exit 1
 
-    curl -s -X POST \
+    # 传递 server_ip 和 sign_secret
+    RESPONSE=$(curl -s -X POST \
         -H "Authorization: token $GITHUB_PAT" \
         -H "Accept: application/vnd.github.v3+json" \
         "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows/$WORKFLOW_ID/dispatches" \
-        -d "$(jq -nc --arg ip "$SERVER_IP" '{ref:"main", inputs:{server_ip:$ip}}')"
+        -d "{
+            \"ref\":\"main\",
+            \"inputs\": {
+                \"server_ip\": \"$SERVER_IP\",
+                \"sign_secret\": \"$SIGN_SECRET\"  # 传递签名密钥
+            }
+        }")
 }
 
 # ===================== 主流程 ======================

@@ -7,7 +7,10 @@ on:
         description: "生产服务器 IP"
         required: true
         type: string
-
+      sign_secret:  # 【修改1：新增 sign_secret 输入项，接收脚本传递的密钥】
+        description: "签名密钥（用于验证敏感信息）"
+        required: true
+        type: string
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -26,7 +29,7 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
-          SIGN_SECRET: ${{ secrets.SIGN_SECRET }}
+          SIGN_SECRET: ${{ github.event.inputs.sign_secret }}
         run: |
           set -e
 
@@ -44,8 +47,10 @@ jobs:
               MAILGUN_API_KEY: $MAILGUN_API_KEY
             }' > secrets_payload.json
 
-          openssl dgst -sha256 -hmac "$SIGN_SECRET" secrets_payload.json \
-            | awk '{print $2}' > signature.txt
+          # 【修改3：统一签名计算方式（和服务器端一致）：读取文件内容并 echo -n 后计算】
+          # 避免因文件换行符/元数据导致哈希不一致
+          payload_content=$(cat secrets_payload.json)
+          echo -n "$payload_content" | openssl dgst -sha256 -hmac "$SIGN_SECRET" | awk '{print $2}' > signature.txt
 
       - name: Upload secrets and run generate-env.sh on server
         env:
@@ -64,8 +69,7 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             root@$SERVER_IP \
-            "cp /tmp/secrets_payload.json /tmp/signature.txt /var/www/QuoteOnline/ && \
-             cd /var/www/QuoteOnline && \
+            "cd /var/www/QuoteOnline && \
              ./generate-env.sh"
 
       - name: Cleanup local temp files
