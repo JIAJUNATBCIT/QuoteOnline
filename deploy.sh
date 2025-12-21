@@ -9,18 +9,6 @@ CLIENT_DIR="$PROJECT_DIR/client"  # Angular 客户端目录
 DIST_DIR="$CLIENT_DIR/dist/quote-online-client"  # 构建输出目录
 WORKFLOW_ID="deploy-from-clone.yml"
 
-# ===================== 自动获取服务器IP =====================
-echo -e "\033[32m===== 自动获取服务器IP =====\033[0m"
-SERVER_IP=$(curl -s --max-time 5 ifconfig.me || hostname -I | awk '{print $1}')
-if [ -z "$SERVER_IP" ]; then
-    echo -e "\033[31m【错误】无法自动获取服务器IP，请手动输入：\033[0m"
-    read -p "服务器IP: " SERVER_IP
-    if [ -z "$SERVER_IP" ]; then
-        exit 1
-    fi
-fi
-echo -e "✅ 服务器IP已获取：$SERVER_IP"
-
 # ===================== 用户输入参数 =====================
 read -p "请输入你的 GitHub PAT（个人访问令牌）: " GITHUB_PAT
 if [ -z "$GITHUB_PAT" ]; then
@@ -172,13 +160,11 @@ echo -e "\033[32m===== 触发 GitHub Actions Workflow（获取完整环境变量
 # 用 jq 构造合法 JSON
 JSON_PAYLOAD=$(jq -nc \
   --arg ref "main" \
-  --arg server_ip "$SERVER_IP" \
   --arg domain "$DOMAIN" \
   --arg github_pat "$GITHUB_PAT" \
   '{
     ref: $ref,
     inputs: {
-      server_ip: $server_ip,
       domain: $domain,
       github_pat: $github_pat
     }

@@ -3,9 +3,6 @@ name: Deploy from Clone
 on:
   workflow_dispatch:
     inputs:
-      server_ip:
-        required: true
-        type: string
       domain:
         required: true
         type: string
@@ -47,7 +44,7 @@ jobs:
 
       - name: 上传完整的 .env 到服务器
         env:
-          SERVER_IP: ${{ github.event.inputs.server_ip }}
+          SERVER_IP: ${{ secrets.SERVER_RESERVED_IP }}
           SERVER_PASS: ${{ secrets.SERVER_PASS }}
           PROJECT_DIR: "/var/www/QuoteOnline"
         run: |
