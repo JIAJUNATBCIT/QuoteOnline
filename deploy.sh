@@ -66,6 +66,7 @@ MAILGUN_API_KEY=CHANGE_ME
 EOF
 
 chmod 600 .env
+cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
 
 # ===================== Nginx 配置 =====================
 TEMPLATE="client/nginx.conf.template"
