@@ -47,9 +47,16 @@ jobs:
               MAILGUN_API_KEY: $MAILGUN_API_KEY
             }' > secrets_payload.json
 
+          echo "===== Workflow 端关键参数 ====="
+          echo "SIGN_SECRET: $SIGN_SECRET"
+          echo "Payload 内容: $(cat secrets_payload.json)"
+          echo "Payload MD5: $(md5sum secrets_payload.json)" # 用于对比服务器端Payload
+
           # 【修改3：统一签名计算方式（和服务器端一致）：读取文件内容并 echo -n 后计算】
           # 避免因文件换行符/元数据导致哈希不一致
           payload_content=$(cat secrets_payload.json)
+          signature=$(echo -n "$payload_content" | openssl dgst -sha256 -hmac "$SIGN_SECRET" | awk '{print $2}')
+          echo "生成的签名: $signature"
           echo -n "$payload_content" | openssl dgst -sha256 -hmac "$SIGN_SECRET" | awk '{print $2}' > signature.txt
 
       - name: Upload secrets and run generate-env.sh on server
