@@ -5,7 +5,9 @@ set -e
 GITHUB_USERNAME="JIAJUNATBCIT"
 GITHUB_REPO="QuoteOnline"
 PROJECT_DIR="/var/www/QuoteOnline"
-WORKFLOW_ID="deploy-from-clone.yml"  # 可替换为 Workflow 数字 ID 更稳定
+CLIENT_DIR="$PROJECT_DIR/client"  # Angular 客户端目录
+DIST_DIR="$CLIENT_DIR/dist/quote-online-client"  # 构建输出目录
+WORKFLOW_ID="deploy-from-clone.yml"
 
 # ===================== 自动获取服务器IP =====================
 echo -e "\033[32m===== 自动获取服务器IP =====\033[0m"
@@ -35,7 +37,7 @@ fi
 # ===================== 安装系统依赖 =====================
 echo -e "\033[32m===== 安装必需系统依赖 =====\033[0m"
 apt update -y > /dev/null 2>&1
-DEPS=("git" "curl" "jq" "openssl" "docker.io" "certbot" "sshpass")
+DEPS=("git" "curl" "jq" "openssl" "docker.io" "certbot" "sshpass" "wget")
 for dep in "${DEPS[@]}"; do
     if ! command -v "$dep" &>/dev/null; then
         echo "正在安装 $dep..."
@@ -54,6 +56,26 @@ if ! docker compose version &>/dev/null; then
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 fi
 
+# ===================== 安装 Node.js 和 Angular CLI（核心：Angular 构建依赖）=====================
+echo -e "\033[32m===== 安装 Node.js 和 Angular CLI =====\033[0m"
+# 安装 Node.js LTS 版本（20.x），适配大多数 Angular 项目
+if ! command -v node &>/dev/null; then
+    echo "正在安装 Node.js 20.x..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null 2>&1
+    apt install -y nodejs > /dev/null 2>&1
+fi
+
+# 安装 Angular CLI（全局）
+if ! command -v ng &>/dev/null; then
+    echo "正在安装 Angular CLI..."
+    npm install -g @angular/cli > /dev/null 2>&1
+fi
+
+# 验证安装
+echo "Node.js 版本：$(node -v)"
+echo "npm 版本：$(npm -v)"
+echo "Angular CLI 版本：$(ng version --no-progress | grep "Angular CLI" | awk '{print $3}')"
+
 # ===================== 克隆/更新项目仓库 =====================
 echo -e "\033[32m===== 克隆/更新项目代码 =====\033[0m"
 mkdir -p "$PROJECT_DIR"
@@ -67,6 +89,32 @@ fi
 # ===== 创建空的 .env 文件，避免后续权限操作报错 =====
 touch "$PROJECT_DIR/.env"
 echo -e "✅ 已创建空的 .env 文件，等待 Workflow 覆盖..."
+
+# ===================== 安装 Angular 项目依赖并执行构建（核心：生成 dist 文件）=====================
+echo -e "\033[32m===== 构建 Angular 项目 =====\033[0m"
+cd "$CLIENT_DIR"
+
+# 安装项目依赖（npm install）
+if [ -f "$CLIENT_DIR/package.json" ]; then
+    echo "正在安装 Angular 项目依赖..."
+    npm install > /dev/null 2>&1  # 安装 package.json 中的依赖
+else
+    echo -e "\033[31m【错误】未找到 Angular 项目的 package.json：$CLIENT_DIR\033[0m"
+    exit 1
+fi
+
+# 执行生产环境构建（生成 dist/quote-online-client）
+echo "正在执行 Angular 生产环境构建..."
+# 注意：Angular 14+ 推荐使用 --configuration production，旧版本可用 --prod
+ng build --configuration production > /dev/null 2>&1
+
+# 验证构建文件是否生成
+if [ -d "$DIST_DIR" ] && [ "$(ls -A "$DIST_DIR")" ]; then
+    echo -e "✅ Angular 项目构建成功，输出目录：$DIST_DIR"
+else
+    echo -e "\033[31m【错误】Angular 构建失败，$DIST_DIR 目录为空！\033[0m"
+    exit 1
+fi
 
 # ===================== 生成简化版 generate-env.sh（仅处理Angular环境文件）=====================
 echo -e "\033[32m===== 生成 generate-env.sh 脚本 =====\033[0m"
@@ -131,17 +179,16 @@ else
   echo -e "\033[33m【警告】Workflow 触发返回信息：$RESPONSE\033[0m"
 fi
 
-# ===================== Nginx 配置 & 启动服务（核心修正：正确生成 nginx.conf）=====================
+# ===================== Nginx 配置 & 启动服务 =====================
 echo -e "\033[32m===== 配置 Nginx 并启动服务 =====\033[0m"
 TEMPLATE="$PROJECT_DIR/client/nginx.conf.template"
 NGINX_CONF="$PROJECT_DIR/client/nginx.conf"
 
-# ===== 关键步骤1：确保 client 目录存在（为配置文件提供存放路径）=====
+# ===== 确保 client 目录存在 =====
 mkdir -p "$PROJECT_DIR/client"
 
-# ===== 关键步骤2：从模板生成 nginx.conf（复制模板 + 替换 DOMAIN 变量）=====
+# ===== 从模板生成 nginx.conf =====
 if [ -f "$TEMPLATE" ]; then
-    # 直接读取模板内容，替换 {{DOMAIN}} 后写入 nginx.conf（一步完成，无需额外复制/重命名）
     sed "s/{{DOMAIN}}/$DOMAIN/g" "$TEMPLATE" > "$NGINX_CONF"
     echo -e "✅ Nginx 配置文件生成成功：$NGINX_CONF"
 else
@@ -167,13 +214,22 @@ certbot certonly --standalone \
 docker compose start nginx > /dev/null 2>&1
 echo -e "✅ Nginx 服务启动成功！"
 
-# ===================== 验证 .env 文件 =====================
-echo -e "\033[32m===== 验证 .env 文件内容 =====\033[0m"
+# ===================== 验证关键文件 =====================
+echo -e "\033[32m===== 验证部署结果 =====\033[0m"
+# 验证 .env 文件
 if [ -f "$PROJECT_DIR/.env" ]; then
-    echo -e "✅ .env 文件包含的关键信息："
+    echo -e "✅ .env 文件存在，包含关键信息："
     cat "$PROJECT_DIR/.env" | grep -E "EMAIL_FROM|EMAIL_HOST|EMAIL_PORT|MONGODB_URI"
 else
     echo -e "\033[31m【错误】.env 文件不存在！\033[0m"
+    exit 1
+fi
+
+# 验证 Angular 构建文件
+if [ -d "$DIST_DIR" ] && [ "$(ls -A "$DIST_DIR")" ]; then
+    echo -e "✅ Angular 构建文件存在，文件数量：$(ls -A "$DIST_DIR" | wc -l)"
+else
+    echo -e "\033[31m【错误】Angular 构建文件为空！\033[0m"
     exit 1
 fi
 
@@ -182,4 +238,5 @@ echo -e "\033[32m======================================\033[0m"
 echo -e "\033[32m🎉 全量部署完成！\033[0m"
 echo -e "\033[32m🌍 访问地址：https://$DOMAIN\033[0m"
 echo -e "\033[32m📂 项目路径：$PROJECT_DIR\033[0m"
+echo -e "\033[32m📦 Angular 构建目录：$DIST_DIR\033[0m"
 echo -e "\033[32m======================================\033[0m"
