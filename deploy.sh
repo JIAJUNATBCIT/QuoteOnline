@@ -4,79 +4,105 @@ set -e
 echo "===== QuoteOnline One-Click Deploy ====="
 
 PROJECT_DIR="/var/www/QuoteOnline"
-GITHUB_REPO="https://github.com/JIAJUNATBCIT/QuoteOnline.git"
-WORKFLOW_FILE="Deploy from Clone"
+REPO_URL="https://github.com/JIAJUNATBCIT/QuoteOnline.git"
 
-# -------------------------
-# 1️⃣ 交互输入
-# -------------------------
-read -p "请输入域名 (例如 portal.ooishipping.com): " DOMAIN
+# ===================== 交互输入（关键：/dev/tty） =====================
+read -p "请输入域名 (例如 portal.ooishipping.com): " DOMAIN < /dev/tty
 if [ -z "$DOMAIN" ]; then
   echo "❌ DOMAIN 不能为空"
   exit 1
 fi
 
-SERVER_IP=$(curl -s ifconfig.me)
+read -s -p "请输入 GitHub PAT（repo 权限即可）: " GITHUB_PAT < /dev/tty
+echo
+if [ -z "$GITHUB_PAT" ]; then
+  echo "❌ GitHub PAT 不能为空"
+  exit 1
+fi
 
-# -------------------------
-# 2️⃣ 安装系统依赖
-# -------------------------
-echo "===== 安装依赖 ====="
-apt update -y
-apt install -y git curl jq docker.io docker-compose-plugin sshpass
+# ===================== 系统依赖 =====================
+echo ">>> 安装系统依赖"
+sudo apt update -y
+sudo apt install -y git curl jq docker.io docker-compose-plugin certbot
 
-systemctl enable docker
-systemctl start docker
+sudo systemctl enable docker
+sudo systemctl start docker
 
-# -------------------------
-# 3️⃣ 拉取 / 更新代码
-# -------------------------
+# ===================== 释放 80 / 443 端口 =====================
+echo ">>> 释放 80 / 443 端口"
+sudo systemctl stop nginx || true
+sudo systemctl stop apache2 || true
+sudo docker ps -q --filter "publish=80" | xargs -r docker stop
+sudo docker ps -q --filter "publish=443" | xargs -r docker stop
+
+# ===================== 拉代码 =====================
+echo ">>> 拉取代码"
 mkdir -p /var/www
 if [ -d "$PROJECT_DIR/.git" ]; then
   cd "$PROJECT_DIR"
   git pull origin main
 else
   rm -rf "$PROJECT_DIR"
-  git clone "$GITHUB_REPO" "$PROJECT_DIR"
-  cd "$PROJECT_DIR"
+  git clone https://$GITHUB_PAT@github.com/JIAJUNATBCIT/QuoteOnline.git "$PROJECT_DIR"
 fi
 
-# -------------------------
-# 4️⃣ 生成 nginx.conf（替换域名）
-# -------------------------
-echo "===== 生成 nginx.conf ====="
-sed "s/{{DOMAIN}}/$DOMAIN/g" \
-  client/nginx.conf.template > client/nginx.conf
+cd "$PROJECT_DIR"
 
-# -------------------------
-# 5️⃣ 触发 GitHub Actions（生成 .env）
-# -------------------------
-echo "===== 触发 GitHub Actions ====="
+# ===================== 生成 .env（稳定版） =====================
+echo ">>> 生成 .env"
 
-read -s -p "请输入 GitHub PAT (repo + workflow 权限): " GITHUB_PAT
+cat > .env <<EOF
+NODE_ENV=production
+PORT=3000
+FRONTEND_URL=https://$DOMAIN
+UPLOAD_PATH=./uploads
+MAX_FILE_SIZE=10485760
+
+# ====== 以下请在服务器后手动替换一次 ======
+MONGODB_URI=REPLACE_ME
+JWT_SECRET=REPLACE_ME
+JWT_REFRESH_SECRET=REPLACE_ME
+EMAIL_PASS=REPLACE_ME
+MAILGUN_API_KEY=REPLACE_ME
+
+EMAIL_FROM=no-reply@$DOMAIN
+EMAIL_HOST=smtp.exmail.qq.com
+EMAIL_PORT=465
+ENABLE_QUOTE_EMAIL_NOTIFICATIONS=true
+MAILGUN_DOMAIN=$DOMAIN
+EOF
+
+chmod 600 .env
+
+# ===================== 生成 nginx.conf =====================
+echo ">>> 生成 nginx.conf"
+
+sed "s/{{DOMAIN}}/$DOMAIN/g" client/nginx.conf.template > client/nginx.conf
+
+# ===================== 启动容器（HTTP） =====================
+echo ">>> 启动 Docker（HTTP）"
+docker compose up -d --build
+
+# ===================== 申请 SSL =====================
+echo ">>> 申请 SSL 证书"
+docker compose stop nginx
+
+sudo certbot certonly \
+  --standalone \
+  -d "$DOMAIN" \
+  -d "www.$DOMAIN" \
+  --agree-tos \
+  --non-interactive \
+  --register-unsafely-without-email
+
+# ===================== 重启 nginx =====================
+echo ">>> 启动 HTTPS"
+docker compose start nginx
+
+# ===================== 自动续期 =====================
+echo ">>> 配置证书自动续期"
+(crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet && docker compose -f $PROJECT_DIR/docker-compose.yml restart nginx") | crontab -
+
 echo
-
-WORKFLOW_ID=$(curl -s \
-  -H "Authorization: token $GITHUB_PAT" \
-  https://api.github.com/repos/JIAJUNATBCIT/QuoteOnline/actions/workflows \
-  | jq -r '.workflows[] | select(.name=="Deploy from Clone") | .id')
-
-if [ -z "$WORKFLOW_ID" ]; then
-  echo "❌ 找不到 workflow"
-  exit 1
-fi
-
-curl -s -X POST \
-  -H "Authorization: token $GITHUB_PAT" \
-  -H "Accept: application/vnd.github.v3+json" \
-  https://api.github.com/repos/JIAJUNATBCIT/QuoteOnline/actions/workflows/$WORKFLOW_ID/dispatches \
-  -d "$(jq -nc \
-    --arg ip "$SERVER_IP" \
-    --arg domain "$DOMAIN" \
-    '{ref:"main", inputs:{server_ip:$ip, domain:$domain}}')"
-
-echo "✅ 已触发 GitHub Actions"
-
-echo
-echo "👉 等待 GitHub Actions 完成后，服务器将自动生成 .env 并启动容器"
-echo "👉 可查看 Actions 页面确认状态"
+echo "✅ 部署完成"
+echo "🌐 https://$DOMAIN"
