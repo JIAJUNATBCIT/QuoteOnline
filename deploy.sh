@@ -105,10 +105,13 @@ echo "正在检测 Angular 项目版本..."
 ANGULAR_VERSION=$(npm list @angular/core --depth=0 2>/dev/null | grep @angular/core | awk -F'@' '{print $3}' | cut -d'.' -f1)
 echo "检测到 Angular 主版本：$ANGULAR_VERSION"
 
+export NODE_OPTIONS=--max-old-space-size=2048
+export CI=true
+
 # 定义构建命令（适配不同版本）
 if [ -z "$ANGULAR_VERSION" ] || [ "$ANGULAR_VERSION" -ge 12 ]; then
     # Angular 12+ 使用 --configuration production
-    BUILD_CMD="CI=true ng build --configuration production"
+    BUILD_CMD="ng build --configuration production"
 else
     # Angular 11 及以下使用 --prod
     BUILD_CMD="ng build --prod"
