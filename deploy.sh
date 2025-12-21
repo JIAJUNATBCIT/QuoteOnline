@@ -210,14 +210,18 @@ fi
 
 # ===================== Nginx 配置 & 启动服务 =====================
 echo -e "\033[32m===== 配置 Nginx 并启动服务 =====\033[0m"
-TEMPLATE="$PROJECT_DIR/client/nginx.conf.template"
-NGINX_CONF="$PROJECT_DIR/client/nginx.conf"
+TEMPLATE="$PROJECT_DIR/client/nginx.conf.template"  # 定义模板文件路径
+NGINX_CONF="$PROJECT_DIR/client/nginx.conf"          # 定义目标配置文件路径
 
-# ===== 确保 client 目录存在 =====
+# 核心修复：静默删除目标路径（避免目录冲突）
+rm -rf "$NGINX_CONF" 2>/dev/null
+
+# 确保 client 目录存在（为配置文件提供存放路径）
 mkdir -p "$PROJECT_DIR/client"
 
-# ===== 从模板生成 nginx.conf =====
+# ===== 【核心生成步骤】从模板生成 nginx.conf =====
 if [ -f "$TEMPLATE" ]; then
+    # 这一行是真正生成 nginx.conf 文件的命令
     sed "s/{{DOMAIN}}/$DOMAIN/g" "$TEMPLATE" > "$NGINX_CONF"
     echo -e "✅ Nginx 配置文件生成成功：$NGINX_CONF"
 else
