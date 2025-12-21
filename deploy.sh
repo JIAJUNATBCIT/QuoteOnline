@@ -281,10 +281,10 @@ echo -e "🔧 生成正式HTTPS版Nginx配置..."
 # 若存在模板文件，优先用模板替换；否则直接生成
 if [ -f "$NGINX_TEMPLATE" ]; then
     # 从模板生成HTTPS配置（需模板中包含SSL相关占位符，若没有则直接生成）
-    sed "s/{{DOMAIN}}/$DOMAIN/g" "$NGINX_TEMPLATE" > "$NGINX_HTTPS_CONF"
+    sed "s/{{DOMAIN}}/$DOMAIN/g" "$NGINX_TEMPLATE" > "$NGINX_CONF"
 else
     # 直接生成HTTPS配置
-    cat > "$NGINX_HTTPS_CONF" << EOF
+    cat > "$NGINX_CONF" << EOF
 # 正式HTTPS配置
 server {
     listen 80;
@@ -337,7 +337,7 @@ ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECD
 EOF
 fi
 
-echo -e "✅ 正式HTTPS配置生成成功：$NGINX_HTTPS_CONF"
+echo -e "✅ 正式HTTPS配置生成成功：$NGINX_CONF"
 
 # ===== 步骤5：重启Nginx容器（加载HTTPS配置）=====
 docker compose restart nginx > /dev/null 2>&1
