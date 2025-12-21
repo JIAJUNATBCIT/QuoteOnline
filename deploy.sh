@@ -6,8 +6,11 @@ GITHUB_USERNAME="JIAJUNATBCIT"
 GITHUB_REPO="QuoteOnline"
 PROJECT_DIR="/var/www/QuoteOnline"
 
-read -p "请输入域名（例如 portal.ooishipping.com）: " DOMAIN
-[ -z "$DOMAIN" ] && echo "域名不能为空" && exit 1
+read -p "请输入你的域名 (例如 portal.ooishipping.com): " DOMAIN
+if [ -z "$DOMAIN" ]; then
+    echo -e "\033[31m【错误】域名不能为空！\033[0m"
+    exit 1
+fi
 
 SERVER_IP=$(curl -s ifconfig.me)
 
