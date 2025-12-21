@@ -1,84 +1,39 @@
-name: Deploy from Clone (Environment Secrets)
+name: Deploy from Clone
 
 on:
   workflow_dispatch:
     inputs:
       server_ip:
-        description: "生产服务器 IP"
         required: true
         type: string
-      sign_secret:  # 【修改1：新增 sign_secret 输入项，接收脚本传递的密钥】
-        description: "签名密钥（用于验证敏感信息）"
-        required: true
-        type: string
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
 
     steps:
-      - name: Install dependencies
+      - name: Generate .env
         run: |
-          sudo apt update
-          sudo apt install -y jq openssl sshpass
+          cat > .env <<EOF
+          NODE_ENV=production
+          PORT=3000
+          MONGODB_URI=${{ secrets.MONGODB_URI }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+          EMAIL_PASS=${{ secrets.EMAIL_PASS }}
+          MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
+          EOF
 
-      - name: Prepare secrets payload and signature
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
-          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-          MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
-          SIGN_SECRET: ${{ github.event.inputs.sign_secret }}
-        run: |
-          set -e
-
-          jq -n -c \
-            --arg MONGODB_URI "$MONGODB_URI" \
-            --arg JWT_SECRET "$JWT_SECRET" \
-            --arg JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET" \
-            --arg EMAIL_PASS "$EMAIL_PASS" \
-            --arg MAILGUN_API_KEY "$MAILGUN_API_KEY" \
-            '{
-              MONGODB_URI: $MONGODB_URI,
-              JWT_SECRET: $JWT_SECRET,
-              JWT_REFRESH_SECRET: $JWT_REFRESH_SECRET,
-              EMAIL_PASS: $EMAIL_PASS,
-              MAILGUN_API_KEY: $MAILGUN_API_KEY
-            }' > secrets_payload.json
-
-          echo "===== Workflow 端关键参数 ====="
-          echo "SIGN_SECRET: $SIGN_SECRET"
-          echo "Payload 内容: $(cat secrets_payload.json)"
-          echo "Payload MD5: $(md5sum secrets_payload.json)" # 用于对比服务器端Payload
-
-          # 【修改3：统一签名计算方式（和服务器端一致）：读取文件内容并 echo -n 后计算】
-          # 避免因文件换行符/元数据导致哈希不一致
-          payload_content=$(cat secrets_payload.json)
-          signature=$(echo -n "$payload_content" | openssl dgst -sha256 -hmac "$SIGN_SECRET" | awk '{print $2}')
-          echo "生成的签名: $signature"
-          echo -n "$payload_content" | openssl dgst -sha256 -hmac "$SIGN_SECRET" | awk '{print $2}' > signature.txt
-
-      - name: Upload secrets and run generate-env.sh on server
+      - name: Upload and deploy
         env:
           SERVER_IP: ${{ github.event.inputs.server_ip }}
           SERVER_PASS: ${{ secrets.SERVER_PASS }}
         run: |
-          set -e
+          sshpass -p "$SERVER_PASS" scp -o StrictHostKeyChecking=no \
+            .env docker-compose.yml \
+            root@$SERVER_IP:/var/www/QuoteOnline/
 
-          sshpass -p "$SERVER_PASS" scp \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            secrets_payload.json signature.txt \
-            root@$SERVER_IP:/tmp/
-
-          sshpass -p "$SERVER_PASS" ssh \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
+          sshpass -p "$SERVER_PASS" ssh -o StrictHostKeyChecking=no \
             root@$SERVER_IP \
-            "cd /var/www/QuoteOnline && \
-             ./generate-env.sh"
-
-      - name: Cleanup local temp files
-        run: |
-          rm -f secrets_payload.json signature.txt
+            "cd /var/www/QuoteOnline && docker compose up -d --build"
