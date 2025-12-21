@@ -5,7 +5,6 @@ set -e
 GITHUB_USERNAME="JIAJUNATBCIT"
 GITHUB_REPO="QuoteOnline"
 PROJECT_DIR="/var/www/QuoteOnline"
-# 建议用 Workflow 数字 ID（更稳定），可通过 GitHub API 获取
 WORKFLOW_ID="deploy-from-clone.yml"
 
 # ===================== 自动获取服务器IP =====================
@@ -65,6 +64,10 @@ else
     git clone "https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_USERNAME/$GITHUB_REPO.git" "$PROJECT_DIR" > /dev/null 2>&1
 fi
 
+# ===== 新增：创建空的 .env 文件，避免后续权限操作报错 =====
+touch "$PROJECT_DIR/.env"
+echo -e "✅ 已创建空的 .env 文件，等待 Workflow 覆盖..."
+
 # ===================== 生成简化版 generate-env.sh（仅处理Angular环境文件）=====================
 echo -e "\033[32m===== 生成 generate-env.sh 脚本 =====\033[0m"
 cat > "$PROJECT_DIR/generate-env.sh" <<'EOF_GENERATE_ENV'
@@ -79,9 +82,7 @@ PROJECT_DIR="$2"
 cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
 echo -e "\033[32m✅ Angular 环境文件复制成功！\033[0m"
 
-# 确保 .env 文件权限正确
-chmod 600 "$PROJECT_DIR/.env"
-echo -e "\033[32m✅ .env 文件权限已设置！\033[0m"
+# 【移除：提前的 chmod 操作，改为后续在 Workflow 完成后执行】
 EOF_GENERATE_ENV
 
 # 赋予执行权限
@@ -120,6 +121,14 @@ RESPONSE=$(curl -s -X POST \
 if [ -z "$RESPONSE" ] || echo "$RESPONSE" | jq -e '.id' &>/dev/null; then
   echo -e "✅ GitHub Workflow 触发成功，正在同步完整 .env 文件..."
   sleep 15  # 等待 Workflow 执行完成
+
+  # ===== 新增：判断 .env 是否存在并设置权限 =====
+  if [ -f "$PROJECT_DIR/.env" ]; then
+    chmod 600 "$PROJECT_DIR/.env"
+    echo -e "✅ .env 文件权限已设置！"
+  else
+    echo -e "\033[33m【警告】.env 文件仍未同步，可能 Workflow 执行失败，请检查 GitHub Actions 日志\033[0m"
+  fi
 else
   echo -e "\033[33m【警告】Workflow 触发返回信息：$RESPONSE\033[0m"
 fi
