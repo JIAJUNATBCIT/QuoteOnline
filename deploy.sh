@@ -148,7 +148,8 @@ RESPONSE=$(curl -s -X POST \
         \"ref\": \"main\",
         \"inputs\": {
             \"server_ip\": \"$SERVER_IP\",
-            \"domain\": \"$DOMAIN\"
+            \"domain\": \"$DOMAIN\",
+            \"github_pat\": \"$GITHUB_PAT\"  # 新增：传递必填的 github_pat 参数
         }
     }")
 
