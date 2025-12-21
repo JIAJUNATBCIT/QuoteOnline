@@ -43,6 +43,8 @@ else
   cd "$PROJECT_DIR"
 fi
 
+cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
+
 ########################################
 # 生成 HTTP-only Nginx 配置（第一次启动）
 ########################################
