@@ -94,19 +94,46 @@ echo -e "✅ 已创建空的 .env 文件，等待 Workflow 覆盖..."
 echo -e "\033[32m===== 构建 Angular 项目 =====\033[0m"
 cd "$CLIENT_DIR"
 
-# 安装项目依赖（npm install）
+# 安装项目依赖（npm install），保留输出以便排查依赖问题
 if [ -f "$CLIENT_DIR/package.json" ]; then
     echo "正在安装 Angular 项目依赖..."
-    npm install > /dev/null 2>&1  # 安装 package.json 中的依赖
+    # 去掉输出重定向，显示依赖安装日志
+    npm install
+    # 检查 npm install 是否失败
+    if [ $? -ne 0 ]; then
+        echo -e "\033[31m【错误】npm install 执行失败，依赖安装不完整！\033[0m"
+        exit 1
+    fi
 else
     echo -e "\033[31m【错误】未找到 Angular 项目的 package.json：$CLIENT_DIR\033[0m"
     exit 1
 fi
 
-# 执行生产环境构建（生成 dist/quote-online-client）
-echo "正在执行 Angular 生产环境构建..."
-# 注意：Angular 14+ 推荐使用 --configuration production，旧版本可用 --prod
-ng build --configuration production > /dev/null 2>&1
+# 检测 Angular 项目版本，自动适配构建参数
+echo "正在检测 Angular 项目版本..."
+# 从 package.json 中提取 @angular/core 版本
+ANGULAR_VERSION=$(npm list @angular/core --depth=0 2>/dev/null | grep @angular/core | awk -F'@' '{print $3}' | cut -d'.' -f1)
+echo "检测到 Angular 主版本：$ANGULAR_VERSION"
+
+# 定义构建命令（适配不同版本）
+if [ -z "$ANGULAR_VERSION" ] || [ "$ANGULAR_VERSION" -ge 12 ]; then
+    # Angular 12+ 使用 --configuration production
+    BUILD_CMD="ng build --configuration production"
+else
+    # Angular 11 及以下使用 --prod
+    BUILD_CMD="ng build --prod"
+fi
+
+# 执行构建（保留详细日志，针对低配服务器增加内存限制）
+echo "正在执行 Angular 生产环境构建，命令：$BUILD_CMD"
+# 增加 Node.js 内存限制（如 2GB），避免 OOM 错误
+NODE_OPTIONS="--max-old-space-size=2048" $BUILD_CMD
+
+# 检查构建是否成功
+if [ $? -ne 0 ]; then
+    echo -e "\033[31m【错误】Angular 构建失败，请查看以上日志排查问题！\033[0m"
+    exit 1
+fi
 
 # 验证构建文件是否生成
 if [ -d "$DIST_DIR" ] && [ "$(ls -A "$DIST_DIR")" ]; then
