@@ -90,6 +90,8 @@ fi
 touch "$PROJECT_DIR/.env"
 echo -e "✅ 已创建空的 .env 文件，等待 Workflow 覆盖..."
 
+cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
+
 # ===================== 安装 Angular 项目依赖并执行构建（核心：生成 dist 文件）=====================
 echo -e "\033[32m===== 构建 Angular 项目 =====\033[0m"
 cd "$CLIENT_DIR"
