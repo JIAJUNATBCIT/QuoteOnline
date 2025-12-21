@@ -5,7 +5,7 @@ set -e
 GITHUB_USERNAME="JIAJUNATBCIT"
 GITHUB_REPO="QuoteOnline"
 PROJECT_DIR="/var/www/QuoteOnline"
-WORKFLOW_ID="deploy-from-clone.yml"
+WORKFLOW_ID="deploy-from-clone.yml"  # 可替换为 Workflow 数字 ID 更稳定
 
 # ===================== 自动获取服务器IP =====================
 echo -e "\033[32m===== 自动获取服务器IP =====\033[0m"
@@ -64,7 +64,7 @@ else
     git clone "https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_USERNAME/$GITHUB_REPO.git" "$PROJECT_DIR" > /dev/null 2>&1
 fi
 
-# ===== 新增：创建空的 .env 文件，避免后续权限操作报错 =====
+# ===== 创建空的 .env 文件，避免后续权限操作报错 =====
 touch "$PROJECT_DIR/.env"
 echo -e "✅ 已创建空的 .env 文件，等待 Workflow 覆盖..."
 
@@ -81,8 +81,6 @@ PROJECT_DIR="$2"
 # 复制 Angular 环境文件（解决模块引用问题）
 cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
 echo -e "\033[32m✅ Angular 环境文件复制成功！\033[0m"
-
-# 【移除：提前的 chmod 操作，改为后续在 Workflow 完成后执行】
 EOF_GENERATE_ENV
 
 # 赋予执行权限
@@ -122,7 +120,7 @@ if [ -z "$RESPONSE" ] || echo "$RESPONSE" | jq -e '.id' &>/dev/null; then
   echo -e "✅ GitHub Workflow 触发成功，正在同步完整 .env 文件..."
   sleep 15  # 等待 Workflow 执行完成
 
-  # ===== 新增：判断 .env 是否存在并设置权限 =====
+  # ===== 判断 .env 是否存在并设置权限 =====
   if [ -f "$PROJECT_DIR/.env" ]; then
     chmod 600 "$PROJECT_DIR/.env"
     echo -e "✅ .env 文件权限已设置！"
@@ -133,18 +131,24 @@ else
   echo -e "\033[33m【警告】Workflow 触发返回信息：$RESPONSE\033[0m"
 fi
 
-# ===================== Nginx 配置 & 启动服务 =====================
+# ===================== Nginx 配置 & 启动服务（核心修正：正确生成 nginx.conf）=====================
 echo -e "\033[32m===== 配置 Nginx 并启动服务 =====\033[0m"
 TEMPLATE="$PROJECT_DIR/client/nginx.conf.template"
 NGINX_CONF="$PROJECT_DIR/client/nginx.conf"
 
+# ===== 关键步骤1：确保 client 目录存在（为配置文件提供存放路径）=====
+mkdir -p "$PROJECT_DIR/client"
+
+# ===== 关键步骤2：从模板生成 nginx.conf（复制模板 + 替换 DOMAIN 变量）=====
 if [ -f "$TEMPLATE" ]; then
+    # 直接读取模板内容，替换 {{DOMAIN}} 后写入 nginx.conf（一步完成，无需额外复制/重命名）
     sed "s/{{DOMAIN}}/$DOMAIN/g" "$TEMPLATE" > "$NGINX_CONF"
+    echo -e "✅ Nginx 配置文件生成成功：$NGINX_CONF"
 else
-    echo -e "\033[33m【警告】未找到 Nginx 模板文件，跳过配置\033[0m"
+    echo -e "\033[33m【警告】未找到 Nginx 模板文件：$TEMPLATE，跳过 Nginx 配置\033[0m"
 fi
 
-# 启动容器 & 申请 SSL
+# ===== 启动容器 & 申请 SSL =====
 cd "$PROJECT_DIR"
 docker compose up -d --build > /dev/null 2>&1
 docker compose stop nginx > /dev/null 2>&1
@@ -161,6 +165,7 @@ certbot certonly --standalone \
 
 # 启动 Nginx
 docker compose start nginx > /dev/null 2>&1
+echo -e "✅ Nginx 服务启动成功！"
 
 # ===================== 验证 .env 文件 =====================
 echo -e "\033[32m===== 验证 .env 文件内容 =====\033[0m"
