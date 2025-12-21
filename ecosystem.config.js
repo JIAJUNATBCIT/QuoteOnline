@@ -2,9 +2,9 @@ module.exports = {
   apps: [{
     name: 'quoteonline',
     script: 'npm',
-    args: 'run prod',
-    cwd: '/app',  // 容器内工作目录（对应Dockerfile的WORKDIR）
-    interpreter: 'node',
+    args: 'run start:prod', // 【关键】直接启动后端服务，跳过前端构建
+    cwd: '/app',
+    interpreter: 'none', // 【必须】禁用 Node 解释器，让 PM2 直接执行 npm 命令
     instances: 1,
     autorestart: true,
     watch: false,
