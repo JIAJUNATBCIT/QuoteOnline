@@ -108,7 +108,7 @@ echo "检测到 Angular 主版本：$ANGULAR_VERSION"
 # 定义构建命令（适配不同版本）
 if [ -z "$ANGULAR_VERSION" ] || [ "$ANGULAR_VERSION" -ge 12 ]; then
     # Angular 12+ 使用 --configuration production
-    BUILD_CMD="ng build --configuration production"
+    BUILD_CMD="ng build --configuration production --no-interactive"
 else
     # Angular 11 及以下使用 --prod
     BUILD_CMD="ng build --prod"
