@@ -67,7 +67,7 @@ detect_os() {
     fi
 }
 
-# ===================== 系统初始化（跨平台适配）=====================
+# ===================== 系统初始化（跨平台适配，增加 firewalld 容错）=====================
 init_system() {
     log_step "系统初始化"
     detect_os
@@ -80,19 +80,43 @@ init_system() {
         log_info "安装 EPEL 源（RHEL/CentOS）..."
         $PKG_MANAGER install -y epel-release > /dev/null 2>&1
         log_info "更新 RHEL/CentOS 软件源..."
-        $PKG_MANAGER update -y > /dev/null 2>&1
+        # 增加 dnf/yum update 的容错，失败时仅警告
+        if ! $PKG_MANAGER update -y > /dev/null 2>&1; then
+            log_warn "软件源更新失败，尝试跳过更新继续执行"
+        fi
     fi
 
-    # 2. 网络配置（仅 CentOS/RHEL 需要）
+    # 2. 网络配置（仅 CentOS/RHEL 需要，增加 firewalld 完整容错）
     if [ "$OS" = "CentOS" ] || [ "$OS" = "RedHat" ]; then
+        log_info "检查 firewalld 服务状态..."
+        # 安装 firewalld（若未安装）
+        if ! command -v firewall-cmd &>/dev/null; then
+            log_warn "firewalld 未安装，正在安装..."
+            $PKG_MANAGER install -y firewalld > /dev/null 2>&1
+        fi
+        # 启动 firewalld（若未启动）
+        if ! systemctl is-active --quiet firewalld; then
+            log_warn "firewalld 未启动，正在启动..."
+            systemctl enable firewalld > /dev/null 2>&1
+            systemctl start firewalld > /dev/null 2>&1
+            sleep 2  # 等待服务启动
+        fi
+        # 开放端口（增加容错，失败时仅警告）
         log_info "开放 80/443 端口（firewalld）..."
-        firewall-cmd --permanent --add-port=80/tcp > /dev/null 2>&1
-        firewall-cmd --permanent --add-port=443/tcp > /dev/null 2>&1
-        firewall-cmd --reload > /dev/null 2>&1
+        if firewall-cmd --permanent --add-port=80/tcp > /dev/null 2>&1 && firewall-cmd --permanent --add-port=443/tcp > /dev/null 2>&1; then
+            firewall-cmd --reload > /dev/null 2>&1
+        else
+            log_warn "开放端口失败，可能是 firewalld 异常，建议手动检查端口配置"
+        fi
 
         log_info "临时关闭 SELinux..."
-        setenforce 0 > /dev/null 2>&1
-        sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config > /dev/null 2>&1
+        # 增加 SELinux 命令的容错（部分系统可能没有 setenforce）
+        if command -v setenforce &>/dev/null; then
+            setenforce 0 > /dev/null 2>&1
+            sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config > /dev/null 2>&1
+        else
+            log_warn "SELINUX 命令未找到，跳过关闭操作"
+        fi
     elif [ "$OS" = "Windows-WSL" ]; then
         log_info "Windows WSL 跳过防火墙/SELinux 配置"
     fi
