@@ -4,6 +4,7 @@ set -euo pipefail
 echo "=========================================="
 echo "  QuoteOnline One-Click Deploy (Stable)"
 echo "  Bridge network + webroot TLS + GH env"
+echo "  (keeps --test-cert)"
 echo "=========================================="
 echo ""
 
@@ -45,13 +46,16 @@ install_deps() {
   if [[ "$mgr" == "apt" ]]; then
     apt update -y
     apt install -y git curl jq ca-certificates gnupg lsb-release openssl
-    # certbot（Ubuntu）
     apt install -y certbot
   else
-    # RHEL/CentOS/Rocky/Alma
     $mgr install -y epel-release || true
     $mgr install -y git curl jq ca-certificates openssl
-    $mgr install -y certbot || $mgr install -y certbot python3-certbot-nginx || true
+
+    # certbot（不同发行版包名不完全一致，尽量兼容）
+    if ! command -v certbot >/dev/null 2>&1; then
+      $mgr install -y certbot || true
+      $mgr install -y python3-certbot-nginx || true
+    fi
   fi
 
   # Docker
@@ -70,7 +74,7 @@ install_deps() {
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
   fi
 
-  # node + npm + ng (用于本机 build 前端，避免 dist 为空)
+  # node + npm + ng（用于本机 build 前端，避免 dist 为空）
   if ! command -v node >/dev/null 2>&1; then
     log "安装 Node.js 20..."
     if [[ "$mgr" == "apt" ]]; then
@@ -110,6 +114,7 @@ clone_repo() {
   mkdir -p /var/www
   cd /var/www
 
+  # NOTE：私仓 clone 用 PAT 的 https URL
   local repo_url="https://${pat}@github.com/${REPO_OWNER}/${REPO_NAME}.git"
 
   if [[ ! -d "$PROJECT_DIR/.git" ]]; then
@@ -179,15 +184,26 @@ build_frontend() {
   fi
 
   npm ci --legacy-peer-deps || npm install --legacy-peer-deps
-  # 兼容不同脚本名：优先 build:optimized，其次 build
+
+  # 兼容不同脚本名：优先 build:optimized，其次 build，其次 ng build
   if npm run | grep -q "build:optimized"; then
     npm run build:optimized
+  elif npm run | grep -q -E "^  build"; then
+    npm run build
   else
     ng build --configuration production
   fi
 
   [[ -f "$DIST_DIR/index.html" ]] || die "前端构建失败：$DIST_DIR/index.html 不存在（dist 为空）"
   ok "前端构建完成：$DIST_DIR"
+}
+
+compose_up_http() {
+  log "启动容器（HTTP 模式先跑起来，供 webroot 验证）..."
+  cd "$PROJECT_DIR"
+  docker compose down || true
+  docker compose up -d --build
+  ok "容器启动完成"
 }
 
 trigger_workflow() {
@@ -203,8 +219,7 @@ trigger_workflow() {
 {
   "ref": "main",
   "inputs": {
-    "domain": "${domain}",
-    "github_pat": "unused"
+    "domain": "${domain}"
   }
 }
 EOF
@@ -218,44 +233,64 @@ wait_for_env() {
   local i=0
   while [[ ! -s "$env_path" ]]; do
     i=$((i+1))
-    if [[ $i -gt 90 ]]; then
-      die "等待超时：$env_path 仍不存在或为空（请检查 GitHub Actions 是否成功 scp 到服务器）"
+    if [[ $i -gt 120 ]]; then
+      die "等待超时：$env_path 仍不存在或为空（检查 GitHub Actions 是否成功 scp 到服务器）"
     fi
     sleep 2
   done
   chmod 600 "$env_path" || true
   ok ".env 已就绪：$env_path"
-}
 
-compose_up_http() {
-  log "启动容器（HTTP 模式先跑起来，供 webroot 验证）..."
+  # 关键：.env 下发后必须重启容器，让 env 生效（避免你怀疑的“先启动容器后写.env”问题）
+  log "重启容器以加载最新 .env ..."
   cd "$PROJECT_DIR"
-  docker compose down || true
-  docker compose up -d --build
-  ok "容器启动完成"
+  docker compose restart backend nginx || true
+  ok "容器已重启加载 .env"
 }
 
-obtain_cert_webroot() {
+verify_acme_path_locally() {
+  local domain="$1"
+  local token="acme-$(date +%s)-$RANDOM"
+  local fpath="$DIST_DIR/.well-known/acme-challenge/${token}"
+
+  log "验证 ACME challenge 路径在本机可访问（http://127.0.0.1/.well-known/...）..."
+  echo "ok-${token}" > "$fpath"
+  chmod 644 "$fpath" || true
+
+  # 通过本机 80 验证（确保 nginx 配置/挂载正确）
+  local got
+  got="$(curl -fsS "http://127.0.0.1/.well-known/acme-challenge/${token}" || true)"
+  rm -f "$fpath" || true
+
+  [[ "$got" == "ok-${token}" ]] || die "ACME 验证路径本机不可访问：请检查 nginx.conf 是否放行 /.well-known 以及 dist 是否正确挂载"
+  ok "本机 ACME 路径验证通过"
+}
+
+obtain_cert_webroot_testcert() {
   local domain="$1"
   local domain_www="www.${domain}"
 
-  log "申请 SSL 证书（webroot 模式）..."
-  # 确保 webroot 存在
+  log "申请 SSL 证书（webroot + --test-cert staging）..."
+
   mkdir -p "$DIST_DIR/.well-known/acme-challenge"
   chmod -R 755 "$DIST_DIR/.well-known" || true
 
-  # 先检查 DNS 是否解析（避免你之前 NXDOMAIN 的情况）
+  # DNS 检查（避免 NXDOMAIN）
   if ! getent ahosts "$domain" >/dev/null 2>&1; then
-    die "DNS 未解析：$domain（请先把 A 记录指到本机公网 IP，等待生效后再跑）"
+    die "DNS 未解析：$domain（请先把 A 记录指到本机公网 IP/Reserved IP，等待生效后再跑）"
   fi
+
+  # 先做本机验证，确保 nginx 的 webroot 正确
+  verify_acme_path_locally "$domain"
 
   certbot certonly --webroot \
     -w "$DIST_DIR" \
     -d "$domain" -d "$domain_www" \
-    --non-interactive --agree-tos --register-unsafely-without-email
+    --non-interactive --agree-tos --register-unsafely-without-email \
+    --test-cert
 
   [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" ]] || die "证书文件不存在，申请失败"
-  ok "证书申请成功：/etc/letsencrypt/live/${domain}/"
+  ok "证书申请成功（staging test-cert）：/etc/letsencrypt/live/${domain}/"
 }
 
 write_nginx_https_from_template() {
@@ -263,7 +298,6 @@ write_nginx_https_from_template() {
   log "生成 HTTPS nginx.conf（基于模板替换 {{DOMAIN}}）..."
 
   [[ -f "$NGINX_TEMPLATE" ]] || die "找不到模板：$NGINX_TEMPLATE"
-
   sed "s/{{DOMAIN}}/${domain}/g" "$NGINX_TEMPLATE" > "$NGINX_CONF"
 
   ok "HTTPS nginx.conf 已生成：$NGINX_CONF"
@@ -277,12 +311,8 @@ restart_nginx_container() {
 }
 
 setup_renew_cron() {
-  local domain="$1"
   log "配置证书自动续期（cron：每天 03:00 renew + 重启 nginx）..."
-
-  # certbot renew 成功后重启 nginx 容器（保证加载新证书）
   (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet && cd $PROJECT_DIR && docker compose restart nginx >/dev/null 2>&1") | crontab -
-
   ok "自动续期已设置"
 }
 
@@ -307,28 +337,28 @@ install_deps "$PKG_MGR"
 free_ports
 clone_repo "$GITHUB_PAT"
 
-# 保证 nginx.conf 先存在（HTTP-only），避免 nginx 直接因 443 证书文件缺失崩掉
+# 先写 HTTP-only nginx.conf，避免 nginx 因 443 证书缺失而崩
 write_nginx_http_only "$DOMAIN"
 
-# 先在服务器把前端打出来（确保 dist 目录不空，webroot 才能工作）
+# 构建前端，保证 dist 存在
 build_frontend
 
-# 起容器（HTTP模式）
+# 起容器（HTTP 模式）
 compose_up_http
 
-# 触发 workflow 下发 .env（你现有 workflow 会 scp .env 到服务器）
+# 触发 workflow 下发 .env，并等待 + 重启容器加载 env
 trigger_workflow "$GITHUB_PAT" "$DOMAIN"
 wait_for_env
 
-# 申请证书（webroot：必须能从公网访问 http://DOMAIN/.well-known/acme-challenge/）
-obtain_cert_webroot "$DOMAIN"
+# 申请证书（webroot + staging test cert）
+obtain_cert_webroot_testcert "$DOMAIN"
 
 # 切换 HTTPS nginx.conf 并重启 nginx
 write_nginx_https_from_template "$DOMAIN"
 restart_nginx_container
 
 # 自动续期
-setup_renew_cron "$DOMAIN"
+setup_renew_cron
 
 echo ""
 echo "=========================================="
@@ -336,4 +366,5 @@ ok "部署完成"
 echo "访问：https://${DOMAIN}"
 echo "项目目录：${PROJECT_DIR}"
 echo "检查：docker compose -f ${PROJECT_DIR}/docker-compose.yml ps"
+echo "日志：docker compose -f ${PROJECT_DIR}/docker-compose.yml logs -f nginx"
 echo "=========================================="
