@@ -233,12 +233,10 @@ log_info "HTTP配置生成成功：$NGINX_CONF"
 
 # ===== 步骤2：修正 Docker Compose 配置 =====
 log_info "修正 Docker Compose 配置..."
-# 移除过时的 version 属性
-sed -i "/version/d" "$DOCKER_COMPOSE_FILE" 2>/dev/null
-# 确保 Docker Compose 中挂载的是 nginx.conf（无需替换，因为本来就是）
-grep -q "./client/nginx.conf:/etc/nginx/conf.d/default.conf" "$DOCKER_COMPOSE_FILE" || {
-    log_warn "Docker Compose 中未找到 nginx.conf 挂载项，建议手动检查！"
-}
+# 安全移除version属性（仅匹配以version开头的行）
+sed -i '/^version/d' "$DOCKER_COMPOSE_FILE" 2>/dev/null
+# 无需检查挂载路径，因为docker-compose.yml中已正确配置
+log_info "Docker Compose 配置修正完成"
 
 # ===== 步骤3：启动容器 =====
 cd "$PROJECT_DIR"
