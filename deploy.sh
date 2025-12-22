@@ -461,6 +461,7 @@ EOF
         -d "$DOMAIN_WWW" \
         --non-interactive \
         --agree-tos \
+        --test-cert \
         --register-unsafely-without-email
 
     # 验证证书
