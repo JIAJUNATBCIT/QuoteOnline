@@ -246,6 +246,7 @@ clone_project() {
     mkdir -p "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
     chmod -R 755 "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
     chown -R root:root "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
+    chown -R node:node "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
 
     # 创建空的 .env 文件
     log_info "创建兜底 .env 文件..."

@@ -9,7 +9,7 @@ WORKDIR /app
 
 # 提前创建日志和上传目录，赋予 node 用户权限（解决写入权限问题）
 RUN mkdir -p /app/logs /app/uploads \
-    && chmod -R 775 /app/logs /app/uploads \
+    && chmod -R 755 /app/logs /app/uploads \
     && chown -R node:node /app/logs /app/uploads
 
 # 复制依赖文件（利用 Docker 缓存，加快构建）
