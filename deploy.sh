@@ -162,20 +162,26 @@ EOF
 }
 
 build_frontend() {
-  # 你的 compose 会把 dist 挂进 nginx，dist 为空就会 403/默认页
   log "构建 Angular 前端（保证 dist 不为空）..."
   cd "$CLIENT_DIR"
 
   [[ -f package.json ]] || die "未找到 $CLIENT_DIR/package.json，无法构建前端"
 
-  # 优先 npm ci，其次 npm install（兼容）
-  npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+  # 禁止任何交互提示（Angular CLI 的 autocompletion 问题）
+  export CI=1
+  export NG_CLI_ANALYTICS=false
+  export APT_LISTCHANGES_FRONTEND=none
+  export DEBIAN_FRONTEND=noninteractive
 
-  # 构建：尽量用 ng build production
-  if npm run | grep -q "build:optimized"; then
-    npm run build:optimized
+  # 安装依赖：优先 ci（更稳定），失败再 fallback install
+  npm ci --legacy-peer-deps --no-audit --no-fund || npm install --legacy-peer-deps --no-audit --no-fund
+
+  # 直接跑 build:optimized（你项目里有这个脚本），并明确 --no-interactive
+  # 如果未来你删了 build:optimized，也会自动 fallback 到 ng build production
+  if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)"; then
+    npm run -s build:optimized -- --no-interactive
   else
-    ng build --configuration production
+    ng build --configuration production --no-interactive
   fi
 
   [[ -f "$DIST_DIR/index.html" ]] || die "前端构建失败：$DIST_DIR/index.html 不存在（dist 为空）"
