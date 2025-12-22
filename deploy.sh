@@ -304,11 +304,11 @@ trigger_workflow() {
     -H "Authorization: Bearer ${pat}" \
     "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches" \
     -d @- >/dev/null <<EOF
-{
-  "ref": "main",
-  "inputs": { "domain": "${domain}" }
-}
-EOF
+    {
+      "ref": "main",
+      "inputs": { "domain": "${domain}" }
+    }
+    EOF
   ok "Workflow 已触发"
 }
 
