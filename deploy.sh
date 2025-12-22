@@ -255,6 +255,16 @@ if ! docker compose ps nginx | grep -q "Up"; then
 fi
 log_info "容器启动成功（HTTP模式）"
 
+# 验证Nginx配置中是否包含acme-challenge路径
+if ! grep -q "/.well-known/acme-challenge/" "$NGINX_CONF"; then
+    log_warn "Nginx配置中缺少acme-challenge路径，自动添加..."
+    # 在server块中插入该配置（简单适配，若需更精准可使用sed）
+    sed -i "/server_name $DOMAIN;/a \    location /.well-known/acme-challenge/ {\n        root /usr/share/nginx/html;\n    }" "$NGINX_CONF"
+    # 重启Nginx容器
+    docker compose restart nginx
+    sleep 3
+fi
+
 # ===== 步骤4：申请SSL证书 =====
 log_info "申请SSL证书（webroot模式）..."
 mkdir -p "$WEBROOT_PATH"
