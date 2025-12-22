@@ -1,3 +1,4 @@
+# deploy-from-clone.yml
 name: Deploy from Clone
 
 on:
@@ -22,6 +23,7 @@ jobs:
           DOMAIN="${{ github.event.inputs.domain }}"
           [[ -n "$DOMAIN" ]] || (echo "domain is empty" && exit 1)
 
+          # 生成 .env 文件，EOF 顶格无缩进，避免 YAML 语法错误
           cat > .env <<EOF
           NODE_ENV=production
           PORT=3000
@@ -44,7 +46,7 @@ jobs:
           MAILGUN_DOMAIN=${{ vars.MAILGUN_DOMAIN }}
           EOF
 
-          # sanity checks
+          # 校验关键变量是否存在
           grep -q '^MONGODB_URI=' .env || (echo "MONGODB_URI missing" && exit 1)
           grep -q '^JWT_SECRET=' .env || (echo "JWT_SECRET missing" && exit 1)
 
@@ -56,24 +58,26 @@ jobs:
           PROJECT_DIR: /var/www/QuoteOnline
         run: |
           set -euo pipefail
+          # 安装 sshpass
           sudo apt-get update -y
           sudo apt-get install -y sshpass
 
-          # Upload .env
+          # 上传 .env 文件到服务器
           sshpass -p "$SERVER_PASS" scp \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             .env root@$SERVER_IP:$PROJECT_DIR/.env
 
-          # Apply + restart
+          # 远程执行命令：重启服务
           sshpass -p "$SERVER_PASS" ssh \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             root@$SERVER_IP "bash -lc '
               set -euo pipefail
               cd \"$PROJECT_DIR\"
-              test -s .env
+              test -s .env || (echo \".env file is empty\" && exit 1)
               chmod 600 .env
 
+              # 重启容器以加载新的 .env
               docker compose up -d
               docker compose restart backend nginx || docker compose restart'"
