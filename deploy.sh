@@ -188,6 +188,8 @@ build_frontend() {
   ok "前端构建完成：$DIST_DIR"
 }
 
+cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
+
 write_nginx_http_only() {
   local domain="$1"
   local domain_www="www.${domain}"
@@ -198,37 +200,37 @@ write_nginx_http_only() {
   chmod -R 755 "$DIST_DIR/.well-known" || true
 
   cat > "$NGINX_CONF" <<EOF
-server {
-  listen 80;
-  server_name ${domain} ${domain_www};
+  server {
+    listen 80;
+    server_name ${domain} ${domain_www};
 
-  root /usr/share/nginx/html;
-  index index.html;
-
-  location /.well-known/acme-challenge/ {
     root /usr/share/nginx/html;
-    try_files \$uri =404;
-  }
+    index index.html;
 
-  location /api/ {
-    proxy_pass http://backend:3000/api/;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-  }
+    location /.well-known/acme-challenge/ {
+      root /usr/share/nginx/html;
+      try_files \$uri =404;
+    }
 
-  location / {
-    try_files \$uri \$uri/ /index.html;
-  }
+    location /api/ {
+      proxy_pass http://backend:3000/api/;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Real-IP \$remote_addr;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
 
-  location /health {
-    access_log off;
-    return 200 "healthy\\n";
-    add_header Content-Type text/plain;
+    location / {
+      try_files \$uri \$uri/ /index.html;
+    }
+
+    location /health {
+      access_log off;
+      return 200 "healthy\\n";
+      add_header Content-Type text/plain;
+    }
   }
-}
-EOF
+  EOF
 
   ok "HTTP-only nginx.conf 已写入：$NGINX_CONF"
 }
