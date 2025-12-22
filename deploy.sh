@@ -94,6 +94,12 @@ else
     git clone "https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_USERNAME/$GITHUB_REPO.git" "$PROJECT_DIR" > /dev/null 2>&1
 fi
 
+# 核心新增：提前创建logs和uploads目录，设置权限
+mkdir -p "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
+chmod -R 755 "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
+chown -R root:root "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
+log_info "已创建项目根目录 logs/uploads 并设置权限"
+
 # 创建空的 .env 文件（兜底）
 touch "$PROJECT_DIR/.env"
 log_info "已创建空的 .env 文件，等待 Workflow 覆盖..."
@@ -225,18 +231,18 @@ EOF
     chmod 600 "$PROJECT_DIR/.env"
 fi
 
-# ===================== Nginx 配置 & 启动服务（核心修改：统一使用 nginx.conf）=====================
+# ===================== Nginx 配置 & 启动服务（核心修改：适配host网络）=====================
 log_info "===== 配置 Nginx 并启动服务 ====="
 mkdir -p "$PROJECT_DIR/client"
 
-# ===== 步骤1：生成 HTTP 配置（直接写入 nginx.conf，支持www域名）=====
+# ===== 步骤1：生成 HTTP 配置（直接写入 nginx.conf，支持www域名 + host网络代理）=====
 log_info "生成HTTP版Nginx配置（nginx.conf）..."
 # 防呆：若nginx.conf是目录，强制删除
 if [ -d "$NGINX_CONF" ]; then
     log_warn "发现$NGINX_CONF是目录，正在删除..."
     rm -rf "$NGINX_CONF"
 fi
-# 生成配置文件
+# 核心修改：proxy_pass改为localhost:3000（host网络下服务名失效）
 cat > "$NGINX_CONF" << EOF
 server {
     listen 80;
@@ -252,7 +258,7 @@ server {
     }
 
     location /api/ {
-        proxy_pass http://backend:3000;
+        proxy_pass http://localhost:3000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -289,7 +295,7 @@ if ! docker compose ps nginx | grep -q "Up"; then
         log_error "Backend容器也启动失败，无法继续！"
     fi
 fi
-log_info "容器启动成功（HTTP模式）"
+log_info "容器启动成功（HTTP模式 + 宿主机网络）"
 
 # ===== 步骤4：申请SSL证书（支持www域名，增加容错输出）=====
 log_info "申请SSL证书（webroot模式）..."
@@ -314,19 +320,20 @@ if [ ! -f "$CERT_PATH" ]; then
 fi
 log_info "SSL证书申请成功"
 
-# ===== 步骤5：覆盖生成 HTTPS 配置（直接写入 nginx.conf）=====
+# ===== 步骤5：覆盖生成 HTTPS 配置（直接写入 nginx.conf + host网络代理）=====
 log_info "生成正式HTTPS配置（覆盖 nginx.conf）..."
 
 # --------------- 修复：移除外部SSL文件依赖，直接使用模板适配 ---------------
 if [ -f "$NGINX_TEMPLATE" ]; then
-    # 替换模板变量，移除无效的外部配置引用
+    # 替换模板变量，移除无效的外部配置引用 + 替换proxy_pass为localhost
     sed -e "s/{{DOMAIN}}/$DOMAIN/g" \
         -e "s|include /etc/letsencrypt/options-ssl-nginx.conf;|# 内置SSL配置，无需外部文件|g" \
         -e "s|ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;|# DH参数已禁用，如需启用请生成文件|g" \
+        -e "s|proxy_pass http://backend:3000|proxy_pass http://localhost:3000|g" \
         "$NGINX_TEMPLATE" > "$NGINX_CONF"
     log_info "从模板生成HTTPS配置成功：$NGINX_CONF"
 else
-    # 生成默认HTTPS配置（支持www域名）
+    # 生成默认HTTPS配置（支持www域名 + host网络代理）
     cat > "$NGINX_CONF" << EOF
 server {
     listen 80;
@@ -361,9 +368,9 @@ server {
     root /usr/share/nginx/html;
     index index.html index.htm;
 
-    # 反向代理后端
+    # 反向代理后端（host网络下用localhost）
     location /api/ {
-        proxy_pass http://backend:3000/api/;
+        proxy_pass http://localhost:3000/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -427,6 +434,13 @@ else
     log_error "Angular 构建文件为空！"
 fi
 
+# 验证日志目录
+if [ -d "$PROJECT_DIR/logs" ]; then
+    log_info "项目根目录 logs 文件夹已创建，权限：$(ls -ld "$PROJECT_DIR/logs" | awk '{print $1}')"
+else
+    log_error "项目根目录 logs 文件夹不存在！"
+fi
+
 # 验证证书
 if [ -f "$CERT_PATH" ]; then
     log_info "SSL证书存在：$CERT_PATH"
@@ -436,9 +450,10 @@ fi
 
 # ===================== 部署完成 =====================
 log_info "======================================"
-log_info "🎉 全量部署完成！"
+log_info "🎉 全量部署完成！（宿主机网络 + 日志本地存储）"
 log_info "🌍 访问地址：https://$DOMAIN"
 log_info "📂 项目路径：$PROJECT_DIR"
 log_info "🔧 Nginx配置文件：$NGINX_CONF"
 log_info "🔒 SSL证书路径：/etc/letsencrypt/live/$DOMAIN"
+log_info "📄 后端日志路径：$PROJECT_DIR/logs"
 log_info "======================================"
