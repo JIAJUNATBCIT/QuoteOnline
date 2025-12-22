@@ -22,7 +22,8 @@ services:
     # 核心1：使用宿主机网络
     network_mode: host
     # 显式加载.env文件
-    env_file: .env
+    env_file:
+      - /var/www/QuoteOnline/.env  # 绝对路径
     environment:
       - NODE_ENV=${NODE_ENV}
       - PORT=${PORT}
