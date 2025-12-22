@@ -157,6 +157,11 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('未处理的 Promise 拒绝', { reason: reason.toString() });
 });
 
+// 健康检查接口
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', timestamp: new Date() });
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date(),
+    version: require('./package.json').version 
+  });
 });
