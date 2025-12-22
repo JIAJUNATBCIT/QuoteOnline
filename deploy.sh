@@ -39,6 +39,9 @@ if [ -z "$DOMAIN" ]; then
     log_error "域名不能为空！"
 fi
 
+# 补充www域名，适配模板
+DOMAIN_WWW="www.$DOMAIN"
+
 # ===================== 安装系统依赖 =====================
 log_info "===== 安装必需系统依赖 ====="
 apt update -y > /dev/null 2>&1
@@ -100,6 +103,9 @@ cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/c
 # ===================== 构建 Angular 项目 =====================
 log_info "===== 构建 Angular 项目 ====="
 cd "$CLIENT_DIR"
+
+# 清理旧构建产物，避免缓存问题
+rm -rf "$DIST_DIR" || true
 
 # 安装依赖
 if [ -f "$CLIENT_DIR/package.json" ]; then
@@ -180,7 +186,7 @@ else
     log_warn "Workflow 触发返回信息：$RESPONSE"
 fi
 
-# ===== 环境变量兜底（关键修复）=====
+# ===== 环境变量兜底（关键修复：补充所有后端必需变量）=====
 if [ -f "$PROJECT_DIR/.env" ]; then
     chmod 600 "$PROJECT_DIR/.env"
     log_info ".env 文件权限已设置！"
@@ -188,12 +194,33 @@ else
     log_warn ".env 文件未同步，生成默认基础配置..."
     cat > "$PROJECT_DIR/.env" << EOF
 # 默认基础环境变量（兜底用）
-EMAIL_USER=default@$DOMAIN
-EMAIL_PASS=default_pass_123
+NODE_ENV=production
+PORT=3000
+DOMAIN=$DOMAIN
+FRONTEND_URL=https://$DOMAIN
+
+# 数据库配置
+MONGODB_URI=mongodb://localhost:27017/quoteonline
+
+# JWT配置
+JWT_SECRET=$(openssl rand -hex 32)
+JWT_REFRESH_SECRET=$(openssl rand -hex 32)
+
+# 邮件配置
 EMAIL_HOST=smtp.$DOMAIN
 EMAIL_PORT=587
-MONGODB_URI=mongodb://localhost:27017/quoteonline
-DOMAIN=$DOMAIN
+EMAIL_USER=default@$DOMAIN
+EMAIL_PASS=default_pass_123
+EMAIL_FROM=default@$DOMAIN
+ENABLE_QUOTE_EMAIL_NOTIFICATIONS=true
+
+# Mailgun配置（可选）
+MAILGUN_API_KEY=your_mailgun_api_key
+MAILGUN_DOMAIN=your_mailgun_domain
+
+# 文件上传配置
+UPLOAD_PATH=/app/uploads
+MAX_FILE_SIZE=10485760
 EOF
     chmod 600 "$PROJECT_DIR/.env"
 fi
@@ -202,18 +229,24 @@ fi
 log_info "===== 配置 Nginx 并启动服务 ====="
 mkdir -p "$PROJECT_DIR/client"
 
-# ===== 步骤1：生成 HTTP 配置（直接写入 nginx.conf，无需临时文件）=====
+# ===== 步骤1：生成 HTTP 配置（直接写入 nginx.conf，支持www域名）=====
 log_info "生成HTTP版Nginx配置（nginx.conf）..."
 cat > "$NGINX_CONF" << EOF
 server {
     listen 80;
-    server_name $DOMAIN;
+    server_name $DOMAIN $DOMAIN_WWW;
 
     root /usr/share/nginx/html;
     index index.html index.htm;
 
+    # 为certbot验证放行路径
+    location /.well-known/acme-challenge/ {
+        root /usr/share/nginx/html;
+        try_files \$uri \$uri/ =404;
+    }
+
     location /api/ {
-        proxy_pass http://quoteonline-backend-1:3000;
+        proxy_pass http://backend:3000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -223,10 +256,6 @@ server {
     location / {
         try_files \$uri \$uri/ /index.html;
     }
-
-    location /.well-known/acme-challenge/ {
-        root /usr/share/nginx/html;
-    }
 }
 EOF
 log_info "HTTP配置生成成功：$NGINX_CONF"
@@ -235,7 +264,8 @@ log_info "HTTP配置生成成功：$NGINX_CONF"
 log_info "修正 Docker Compose 配置..."
 # 安全移除version属性（仅匹配以version开头的行）
 sed -i '/^version/d' "$DOCKER_COMPOSE_FILE" 2>/dev/null
-# 无需检查挂载路径，因为docker-compose.yml中已正确配置
+# 确保backend服务显式加载.env文件
+sed -i '/services.backend/a \    env_file: .env' "$DOCKER_COMPOSE_FILE" 2>/dev/null
 log_info "Docker Compose 配置修正完成"
 
 # ===== 步骤3：启动容器 =====
@@ -255,26 +285,21 @@ if ! docker compose ps nginx | grep -q "Up"; then
 fi
 log_info "容器启动成功（HTTP模式）"
 
-# 验证Nginx配置中是否包含acme-challenge路径
-if ! grep -q "/.well-known/acme-challenge/" "$NGINX_CONF"; then
-    log_warn "Nginx配置中缺少acme-challenge路径，自动添加..."
-    # 在server块中插入该配置（简单适配，若需更精准可使用sed）
-    sed -i "/server_name $DOMAIN;/a \    location /.well-known/acme-challenge/ {\n        root /usr/share/nginx/html;\n    }" "$NGINX_CONF"
-    # 重启Nginx容器
-    docker compose restart nginx
-    sleep 3
-fi
-
-# ===== 步骤4：申请SSL证书 =====
+# ===== 步骤4：申请SSL证书（支持www域名，增加容错输出）=====
 log_info "申请SSL证书（webroot模式）..."
-mkdir -p "$WEBROOT_PATH"
+# 确保验证目录存在并有权限
+mkdir -p "$WEBROOT_PATH/.well-known/acme-challenge"
+chmod 755 "$WEBROOT_PATH/.well-known/acme-challenge"
+
+# 执行certbot，保留输出便于调试
 certbot certonly \
     --webroot \
     -w "$WEBROOT_PATH" \
     -d "$DOMAIN" \
+    -d "$DOMAIN_WWW" \
     --non-interactive \
     --agree-tos \
-    --register-unsafely-without-email > /dev/null 2>&1
+    --register-unsafely-without-email
 
 # 验证证书
 CERT_PATH="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
@@ -286,61 +311,45 @@ log_info "SSL证书申请成功"
 # ===== 步骤5：覆盖生成 HTTPS 配置（直接写入 nginx.conf）=====
 log_info "生成正式HTTPS配置（覆盖 nginx.conf）..."
 
-# --------------- 修复1：创建缺失的SSL相关文件 ---------------
-# 1. 创建 options-ssl-nginx.conf
-SSL_OPTIONS_CONF="/etc/letsencrypt/options-ssl-nginx.conf"
-if [ ! -f "$SSL_OPTIONS_CONF" ]; then
-    log_info "创建缺失的 SSL 优化配置文件：$SSL_OPTIONS_CONF"
-    sudo mkdir -p /etc/letsencrypt
-    cat > "$SSL_OPTIONS_CONF" << EOF
-ssl_session_cache shared:SSL:10m;
-ssl_session_timeout 10m;
-ssl_protocols TLSv1.2 TLSv1.3;
-ssl_prefer_server_ciphers on;
-ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384";
-EOF
-fi
-
-# 2. 创建 ssl-dhparams.pem（用OpenSSL生成，若不存在）
-SSL_DHPARAMS_CONF="/etc/letsencrypt/ssl-dhparams.pem"
-if [ ! -f "$SSL_DHPARAMS_CONF" ]; then
-    log_info "创建缺失的 DH 参数文件：$SSL_DHPARAMS_CONF（生成可能需要1-2分钟）"
-    # 生成2048位的DH参数（速度快，兼顾安全），若需更高安全可改为4096（耗时更长）
-    sudo openssl dhparam -out "$SSL_DHPARAMS_CONF" 2048 > /dev/null 2>&1
-fi
-
-# --------------- 修复2：处理模板中的引用 ---------------
+# --------------- 修复：移除外部SSL文件依赖，直接使用模板适配 ---------------
 if [ -f "$NGINX_TEMPLATE" ]; then
-    # 核心：注释模板中的 options-ssl-nginx.conf 和 ssl-dhparams.pem 引用
-    sed -e "s|include /etc/letsencrypt/options-ssl-nginx.conf;|# include /etc/letsencrypt/options-ssl-nginx.conf;|g" \
-        -e "s|ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;|# ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;|g" \
-        -e "s/{{DOMAIN}}/$DOMAIN/g" \
+    # 替换模板变量，移除无效的外部配置引用
+    sed -e "s/{{DOMAIN}}/$DOMAIN/g" \
+        -e "s|include /etc/letsencrypt/options-ssl-nginx.conf;|# 内置SSL配置，无需外部文件|g" \
+        -e "s|ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;|# DH参数已禁用，如需启用请生成文件|g" \
         "$NGINX_TEMPLATE" > "$NGINX_CONF"
+    log_info "从模板生成HTTPS配置成功：$NGINX_CONF"
 else
-    # 生成默认HTTPS配置（内置SSL配置，不依赖外部文件）
+    # 生成默认HTTPS配置（支持www域名）
     cat > "$NGINX_CONF" << EOF
 server {
     listen 80;
-    server_name $DOMAIN;
-    return 301 https://\$host\$request_uri;
+    server_name $DOMAIN $DOMAIN_WWW;
+
+    # 仅放行验证路径，其余重定向
+    location /.well-known/acme-challenge/ {
+        root /usr/share/nginx/html;
+    }
+
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
 }
 
 server {
     listen 443 ssl http2;
-    server_name $DOMAIN;
+    server_name $DOMAIN $DOMAIN_WWW;
 
     # SSL证书配置
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 
-    # 内置SSL优化配置（无需外部文件）
+    # 内置SSL优化配置
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
     ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384";
-    # 若需要DH参数，可取消注释（文件已生成）
-    # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
     # 静态文件配置
     root /usr/share/nginx/html;
@@ -348,16 +357,39 @@ server {
 
     # 反向代理后端
     location /api/ {
-        proxy_pass http://quoteonline-backend-1:3000;
+        proxy_pass http://backend:3000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
     }
 
     # Angular单页应用路由
     location / {
         try_files \$uri \$uri/ /index.html;
+
+        # 静态资源缓存
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # HTML不缓存
+        location ~* \.html$ {
+            expires -1;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+        }
+    }
+
+    # 健康检查
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
     }
 }
 EOF
@@ -377,7 +409,7 @@ log_info "===== 验证部署结果 ====="
 # 验证.env
 if [ -f "$PROJECT_DIR/.env" ]; then
     log_info ".env 文件存在，关键信息："
-    cat "$PROJECT_DIR/.env" | grep -E "EMAIL_FROM|EMAIL_HOST|MONGODB_URI"
+    cat "$PROJECT_DIR/.env" | grep -E "DOMAIN|MONGODB_URI|JWT_SECRET"
 else
     log_error ".env 文件不存在！"
 fi

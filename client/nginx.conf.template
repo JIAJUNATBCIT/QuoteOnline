@@ -1,11 +1,19 @@
+# HTTPS 服务块
 server {
     listen 443 ssl;
     server_name {{DOMAIN}} www.{{DOMAIN}};
 
     ssl_certificate /etc/letsencrypt/live/{{DOMAIN}}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/{{DOMAIN}}/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # 移除外部SSL配置引用，内置基础SSL配置（避免文件缺失）
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384";
+    # 可选：若需要DH参数，确保文件存在后取消注释
+    # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
     root /usr/share/nginx/html;
     index index.html;
@@ -53,9 +61,22 @@ server {
     error_log /var/log/nginx/{{DOMAIN}}.error.log;
 }
 
+# HTTP 服务块（核心：为certbot验证路径放行，避免重定向）
 server {
     listen 80;
     server_name {{DOMAIN}} www.{{DOMAIN}};
 
-    return 301 https://$host$request_uri;
+    # 关键：放行acme-challenge验证路径，不重定向
+    location /.well-known/acme-challenge/ {
+        root /usr/share/nginx/html;
+        try_files $uri $uri/ =404;
+    }
+
+    # 其他所有请求重定向到HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+
+    access_log /var/log/nginx/{{DOMAIN}}-http.access.log;
+    error_log /var/log/nginx/{{DOMAIN}}-http.error.log;
 }
