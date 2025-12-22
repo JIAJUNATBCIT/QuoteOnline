@@ -231,6 +231,12 @@ mkdir -p "$PROJECT_DIR/client"
 
 # ===== 步骤1：生成 HTTP 配置（直接写入 nginx.conf，支持www域名）=====
 log_info "生成HTTP版Nginx配置（nginx.conf）..."
+# 防呆：若nginx.conf是目录，强制删除
+if [ -d "$NGINX_CONF" ]; then
+    log_warn "发现$NGINX_CONF是目录，正在删除..."
+    rm -rf "$NGINX_CONF"
+fi
+# 生成配置文件
 cat > "$NGINX_CONF" << EOF
 server {
     listen 80;
