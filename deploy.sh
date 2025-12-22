@@ -188,7 +188,6 @@ build_frontend() {
   ok "前端构建完成：$DIST_DIR"
 }
 
-
 write_nginx_http_only() {
   local domain="$1"
   local domain_www="www.${domain}"
@@ -198,38 +197,39 @@ write_nginx_http_only() {
   mkdir -p "$DIST_DIR/.well-known/acme-challenge"
   chmod -R 755 "$DIST_DIR/.well-known" || true
 
+  # 关键修复：EOF 顶格书写，无缩进
   cat > "$NGINX_CONF" <<EOF
-  server {
-    listen 80;
-    server_name ${domain} ${domain_www};
+server {
+  listen 80;
+  server_name ${domain} ${domain_www};
 
+  root /usr/share/nginx/html;
+  index index.html;
+
+  location /.well-known/acme-challenge/ {
     root /usr/share/nginx/html;
-    index index.html;
-
-    location /.well-known/acme-challenge/ {
-      root /usr/share/nginx/html;
-      try_files \$uri =404;
-    }
-
-    location /api/ {
-      proxy_pass http://backend:3000/api/;
-      proxy_set_header Host \$host;
-      proxy_set_header X-Real-IP \$remote_addr;
-      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    location / {
-      try_files \$uri \$uri/ /index.html;
-    }
-
-    location /health {
-      access_log off;
-      return 200 "healthy\\n";
-      add_header Content-Type text/plain;
-    }
+    try_files \$uri =404;
   }
-  EOF
+
+  location /api/ {
+    proxy_pass http://backend:3000/api/;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+  }
+
+  location / {
+    try_files \$uri \$uri/ /index.html;
+  }
+
+  location /health {
+    access_log off;
+    return 200 "healthy\\n";
+    add_header Content-Type text/plain;
+  }
+}
+EOF
 
   ok "HTTP-only nginx.conf 已写入：$NGINX_CONF"
 }
@@ -298,16 +298,17 @@ trigger_workflow() {
   local domain="$2"
 
   log "触发 GitHub Actions（下发 .env）..."
+  # 关键修复：EOF 顶格书写，无缩进
   curl -fsSL -X POST \
     -H "Accept: application/vnd.github+json" \
     -H "Authorization: Bearer ${pat}" \
     "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches" \
     -d @- >/dev/null <<EOF
-    {
-      "ref": "main",
-      "inputs": { "domain": "${domain}" }
-    }
-    EOF
+{
+  "ref": "main",
+  "inputs": { "domain": "${domain}" }
+}
+EOF
   ok "Workflow 已触发"
 }
 
