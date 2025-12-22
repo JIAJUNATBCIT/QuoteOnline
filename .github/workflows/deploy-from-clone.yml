@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       domain:
-        description: "部署域名"
+        description: "部署域名（例如 portal.ooishipping.com）"
         required: true
         type: string
 
@@ -23,12 +23,8 @@ jobs:
           set -euo pipefail
 
           DOMAIN="${{ github.event.inputs.domain }}"
-          if [[ -z "$DOMAIN" ]]; then
-            echo "domain is empty"
-            exit 1
-          fi
+          [[ -n "$DOMAIN" ]] || { echo "domain is empty"; exit 1; }
 
-          # 生成 .env（注意：不要缩进，否则会写入前导空格）
           cat > .env <<EOF
           NODE_ENV=production
           PORT=3000
@@ -51,12 +47,14 @@ jobs:
           MAILGUN_DOMAIN=${{ vars.MAILGUN_DOMAIN }}
           EOF
 
-          # 基本校验：避免意外为空
-          grep -q "^MONGODB_URI=" .env || (echo "MONGODB_URI missing" && exit 1)
-          grep -q "^JWT_SECRET=" .env || (echo "JWT_SECRET missing" && exit 1)
-          grep -q "^EMAIL_FROM=" .env || (echo "EMAIL_FROM missing" && exit 1)
+          # sanity checks: avoid pushing empty env accidentally
+          grep -q '^MONGODB_URI=' .env || { echo "MONGODB_URI missing"; exit 1; }
+          grep -q '^JWT_SECRET=' .env || { echo "JWT_SECRET missing"; exit 1; }
+          grep -q '^JWT_REFRESH_SECRET=' .env || { echo "JWT_REFRESH_SECRET missing"; exit 1; }
+          grep -q '^EMAIL_PASS=' .env || { echo "EMAIL_PASS missing"; exit 1; }
+          grep -q '^MAILGUN_API_KEY=' .env || { echo "MAILGUN_API_KEY missing"; exit 1; }
 
-      - name: Upload .env (atomic) and restart services
+      - name: Upload .env and apply (docker compose up + restart)
         shell: bash
         env:
           SERVER_IP: ${{ secrets.SERVER_RESERVED_IP }}
@@ -64,47 +62,28 @@ jobs:
           PROJECT_DIR: /var/www/QuoteOnline
         run: |
           set -euo pipefail
-
-          if [[ -z "${SERVER_IP}" ]]; then
-            echo "SERVER_IP missing (check secrets.SERVER_RESERVED_IP)"
-            exit 1
-          fi
-
           sudo apt-get update -y
           sudo apt-get install -y sshpass
 
-          # 先上传到临时文件，再原子替换，避免半写入
+          # Upload .env
           sshpass -p "$SERVER_PASS" scp \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
-            .env root@"$SERVER_IP":"$PROJECT_DIR/.env.tmp"
+            .env root@"$SERVER_IP":"$PROJECT_DIR/.env"
 
-          # 在服务器端：校验 + chmod + mv 替换 + 重启
+          # Apply on server: ensure compose is running and reload env by restart
           sshpass -p "$SERVER_PASS" ssh \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
-            root@"$SERVER_IP" bash -s <<EOF_REMOTE
-            set -euo pipefail
+            root@"$SERVER_IP" "bash -lc '
+              set -euo pipefail
+              cd \"$PROJECT_DIR\"
+              test -s .env
+              chmod 600 .env
 
-            cd "$PROJECT_DIR"
+              docker compose up -d
+              # 重启让容器重新加载 .env
+              docker compose restart backend nginx 2>/dev/null || docker compose restart
 
-            test -f docker-compose.yml || test -f compose.yml || { echo "compose file not found in $PROJECT_DIR"; exit 1; }
-            test -f .env.tmp || { echo ".env.tmp missing"; exit 1; }
-
-            # 原子替换 .env
-            chmod 600 .env.tmp
-            mv -f .env.tmp .env
-            chmod 600 .env
-
-            # 确保 docker compose 可用
-            docker compose version >/dev/null 2>&1 || { echo "docker compose not available"; exit 1; }
-
-            # 拉取镜像（如果用的是 build，这一步不会伤害；如果用 image 更有用）
-            docker compose pull || true
-
-            # 启动/更新，再重启确保加载新 env
-            docker compose up -d --remove-orphans
-            docker compose restart backend nginx || docker compose restart
-
-            docker compose ps
-            EOF_REMOTE
+              docker compose ps
+            '"
