@@ -1,7 +1,6 @@
 #!/bin/bash
-# 强制关闭 xtrace 调试模式，消除 + 号输出
+# 强制关闭调试模式，消除+号输出；保留错误退出
 set +x
-# 保留错误退出，确保脚本异常时终止
 set -e
 
 # ===================== 基础配置 =====================
@@ -16,29 +15,40 @@ NGINX_TEMPLATE="$PROJECT_DIR/client/nginx.conf.template"
 WEBROOT_PATH="$DIST_DIR"
 DOCKER_COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
 
-# ===================== 极简日志函数 =====================
-log_info() {
-    # 仅输出带颜色的信息，不换行（可选），避免多余空行
-    echo -e "\033[32m[INFO] $1\033[0m"
+# 部署总阶段数（用于进度标识）
+TOTAL_STEPS=10
+CURRENT_STEP=0
+
+# ===================== 日志函数（带进度，无重复）=====================
+# 进度信息函数
+log_step() {
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    echo -e "\033[32m[${CURRENT_STEP}/${TOTAL_STEPS}] $1\033[0m"
 }
 
+# 普通信息函数（次级提示）
+log_info() {
+    echo -e "  → $1"
+}
+
+# 警告函数
 log_warn() {
     echo -e "\033[33m[WARN] $1\033[0m"
 }
 
+# 错误函数
 log_error() {
     echo -e "\033[31m[ERROR] $1\033[0m"
     exit 1
 }
 
 # ===================== 终极静默函数（覆盖所有场景）=====================
-# 支持管道、子命令等所有场景的静默执行
 silent() {
-    # 重定向标准输出、标准错误，同时关闭 xtrace
     (set +x; "$@") > /dev/null 2>&1
 }
 
 # ===================== 用户输入参数 =====================
+log_step "获取部署参数"
 read -p "请输入你的 GitHub PAT（个人访问令牌）: " GITHUB_PAT
 if [ -z "$GITHUB_PAT" ]; then
     log_error "GitHub PAT 不能为空！"
@@ -48,16 +58,16 @@ read -p "请输入你的域名（例如 portal.ooishipping.com）: " DOMAIN
 if [ -z "$DOMAIN" ]; then
     log_error "域名不能为空！"
 fi
-
 DOMAIN_WWW="www.$DOMAIN"
+log_info "参数获取完成：域名=$DOMAIN"
 
 # ===================== 安装系统依赖 =====================
-log_info "开始安装系统依赖..."
+log_step "安装系统依赖"
 silent apt update -y
-DEPS=("git" "curl" "jq" "openssl" "docker.io" "certbot" "sshpass" "wget" "curl")
+DEPS=("git" "curl" "jq" "openssl" "docker.io" "certbot" "sshpass" "wget")
 for dep in "${DEPS[@]}"; do
     if ! command -v "$dep" &>/dev/null; then
-        echo "  安装 $dep..."
+        log_info "安装 $dep..."
         silent apt install -y "$dep"
     fi
 done
@@ -65,43 +75,46 @@ done
 # 启动 Docker
 silent systemctl enable docker
 silent systemctl start docker
+log_info "Docker 服务已启动"
 
 # 安装 Docker Compose（若未安装）
 if ! command -v docker compose &>/dev/null; then
-    echo "  安装 Docker Compose..."
+    log_info "安装 Docker Compose..."
     silent mkdir -p /usr/local/lib/docker/cli-plugins
     silent curl -SL https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
     silent chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 fi
+log_info "系统依赖安装完成"
 
 # ===================== 安装 Node.js 和 Angular CLI =====================
-log_info "开始安装 Node.js 和 Angular CLI..."
+log_step "安装 Node.js 和 Angular CLI"
 # 安装 Node.js LTS 20.x
 if ! command -v node &>/dev/null; then
-    echo "  安装 Node.js 20.x..."
-    # 处理管道命令的静默（将整个管道传入 silent）
+    log_info "安装 Node.js 20.x..."
     silent bash -c "$(curl -fsSL https://deb.nodesource.com/setup_20.x)"
     silent apt install -y nodejs
+else
+    log_info "Node.js 已安装（版本：$(node -v | awk -F'v' '{print $2}')）"
 fi
 
 # 安装 Angular CLI
 if ! command -v ng &>/dev/null; then
-    echo "  安装 Angular CLI..."
+    log_info "安装 Angular CLI..."
     silent npm install -g @angular/cli
+else
+    log_info "Angular CLI 已安装（版本：$(ng version --no-progress | grep "Angular CLI" | awk '{print $3}')）"
 fi
-
-# 验证安装（简化输出）
-echo "  Node.js 版本：$(node -v | awk -F'v' '{print $2}')"
-echo "  npm 版本：$(npm -v)"
-echo "  Angular CLI 版本：$(ng version --no-progress | grep "Angular CLI" | awk '{print $3}')"
+log_info "Node.js 环境安装完成"
 
 # ===================== 克隆/更新项目仓库 =====================
-log_info "开始克隆/更新项目代码..."
+log_step "克隆/更新项目代码"
 silent mkdir -p "$PROJECT_DIR"
 
 if [ -d "$PROJECT_DIR/.git" ]; then
+    log_info "更新现有代码..."
     silent bash -c "cd $PROJECT_DIR && git pull origin main"
 else
+    log_info "克隆新项目代码..."
     silent git clone "https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_USERNAME/$GITHUB_REPO.git" "$PROJECT_DIR"
 fi
 
@@ -109,19 +122,20 @@ fi
 silent mkdir -p "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
 silent chmod -R 775 "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
 silent chown -R root:node "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
-echo "  已创建 logs/uploads 目录并设置权限"
+log_info "已创建 logs/uploads 目录并设置权限"
 
 # 创建空的 .env 文件
 silent touch "$PROJECT_DIR/.env"
 silent cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
+log_info "项目代码准备完成"
 
 # ===================== 构建 Angular 项目 =====================
-log_info "开始构建 Angular 项目..."
+log_step "构建 Angular 前端项目"
 silent cd "$CLIENT_DIR"
 silent rm -rf "$DIST_DIR"
 
 if [ -f "$CLIENT_DIR/package.json" ]; then
-    echo "  安装 Angular 依赖..."
+    log_info "安装 Angular 依赖..."
     silent npm install
 else
     log_error "未找到 package.json：$CLIENT_DIR"
@@ -129,7 +143,7 @@ fi
 
 # 检测 Angular 版本
 ANGULAR_VERSION=$(npm list @angular/core --depth=0 2>/dev/null | grep @angular/core | awk -F'@' '{print $3}' | cut -d'.' -f1)
-echo "  检测到 Angular 版本：$ANGULAR_VERSION"
+log_info "检测到 Angular 版本：$ANGULAR_VERSION"
 
 # 构建命令
 export NODE_OPTIONS=--max-old-space-size=2048
@@ -139,17 +153,17 @@ if [ -z "$ANGULAR_VERSION" ] || [ "$ANGULAR_VERSION" -lt 12 ]; then
     BUILD_CMD="ng build --prod"
 fi
 
-echo "  执行构建：$BUILD_CMD"
+log_info "执行构建：$BUILD_CMD"
 silent bash -c "NODE_OPTIONS='--max-old-space-size=2048' $BUILD_CMD"
 
 if [ -d "$DIST_DIR" ] && [ "$(ls -A "$DIST_DIR" 2>/dev/null)" ]; then
-    echo "  Angular 构建成功，文件数：$(ls -A "$DIST_DIR" | wc -l)"
+    log_info "Angular 构建成功，文件数：$(ls -A "$DIST_DIR" | wc -l)"
 else
     log_error "Angular 构建失败！"
 fi
 
-# ===================== 生成 generate-env.sh =====================
-log_info "生成环境配置脚本..."
+# ===================== 生成环境配置脚本 =====================
+log_step "生成环境配置脚本"
 silent cat > "$PROJECT_DIR/generate-env.sh" <<'EOF_GENERATE_ENV'
 #!/bin/bash
 set -e
@@ -160,9 +174,10 @@ EOF_GENERATE_ENV
 
 silent chmod +x "$PROJECT_DIR/generate-env.sh"
 silent "$PROJECT_DIR/generate-env.sh" "$DOMAIN" "$PROJECT_DIR"
+log_info "环境配置脚本生成完成"
 
 # ===================== 触发 GitHub Workflow =====================
-log_info "触发 GitHub Actions Workflow..."
+log_step "触发 GitHub Actions Workflow"
 JSON_PAYLOAD=$(silent jq -nc \
     --arg ref "main" \
     --arg domain "$DOMAIN" \
@@ -183,19 +198,19 @@ RESPONSE=$(silent curl -s -X POST \
     -d "$JSON_PAYLOAD")
 
 if [ -z "$RESPONSE" ] || echo "$RESPONSE" | silent jq -e '.id' &>/dev/null; then
-    echo "  Workflow 触发成功，等待同步配置..."
+    log_info "Workflow 触发成功，等待同步配置..."
     silent sleep 15
 else
     log_warn "Workflow 触发返回信息：$RESPONSE"
 fi
 
-# ===================== 环境变量兜底 =====================
-log_info "配置环境变量..."
+# ===================== 配置环境变量 =====================
+log_step "配置项目环境变量"
 if [ -f "$PROJECT_DIR/.env" ]; then
     silent chmod 600 "$PROJECT_DIR/.env"
-    echo "  .env 文件已加载"
+    log_info ".env 文件已加载"
 else
-    echo "  生成默认 .env 配置..."
+    log_info "生成默认 .env 配置..."
     silent cat > "$PROJECT_DIR/.env" << EOF
 NODE_ENV=production
 PORT=3000
@@ -216,10 +231,11 @@ UPLOAD_PATH=/app/uploads
 MAX_FILE_SIZE=10485760
 EOF
     silent chmod 600 "$PROJECT_DIR/.env"
+    log_info "默认 .env 配置生成完成"
 fi
 
-# ===================== Nginx 配置 =====================
-log_info "配置 Nginx 服务..."
+# ===================== 配置 Nginx 并启动容器 =====================
+log_step "配置 Nginx 并启动容器"
 silent mkdir -p "$PROJECT_DIR/client"
 
 # 生成 HTTP 配置
@@ -250,7 +266,7 @@ server {
 }
 EOF
 
-# 修正 Docker Compose 配置
+# 修正 Docker Compose 配置（健康检查+资源限制）
 if ! grep -q "healthcheck" "$DOCKER_COMPOSE_FILE"; then
     silent sed -i '/services.backend/ a \
     healthcheck:\
@@ -274,9 +290,9 @@ if ! grep -q "nginx.*healthcheck" "$DOCKER_COMPOSE_FILE"; then
       timeout: 5s\
       retries: 3' "$DOCKER_COMPOSE_FILE"
 fi
+log_info "Nginx 基础配置完成"
 
-# ===================== 启动容器 =====================
-log_info "启动容器服务..."
+# 启动容器
 silent cd "$PROJECT_DIR"
 silent docker compose down
 silent docker compose up -d --build
@@ -285,11 +301,11 @@ silent sleep 10
 # 检查容器状态
 BACKEND_HEALTH=$(docker compose inspect -f '{{.State.Health.Status}}' backend 2>/dev/null || echo "unknown")
 NGINX_HEALTH=$(docker compose inspect -f '{{.State.Health.Status}}' nginx 2>/dev/null || echo "unknown")
-echo "  Backend 健康状态：$BACKEND_HEALTH"
-echo "  Nginx 健康状态：$NGINX_HEALTH"
+log_info "Backend 健康状态：$BACKEND_HEALTH"
+log_info "Nginx 健康状态：$NGINX_HEALTH"
 
-# ===================== 申请 SSL 证书 =====================
-log_info "申请 SSL 证书..."
+# ===================== 申请 SSL 证书并配置 HTTPS =====================
+log_step "申请 SSL 证书并配置 HTTPS"
 silent mkdir -p "$WEBROOT_PATH/.well-known/acme-challenge"
 silent chmod 755 "$WEBROOT_PATH/.well-known/acme-challenge"
 
@@ -306,13 +322,12 @@ silent certbot certonly \
 # 验证证书
 CERT_PATH="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
 if [ -f "$CERT_PATH" ]; then
-    echo "  SSL 证书申请成功"
+    log_info "SSL 证书申请成功"
 else
     log_error "SSL 证书申请失败！"
 fi
 
-# ===================== 生成 HTTPS 配置 =====================
-log_info "配置 HTTPS 服务..."
+# 生成 HTTPS 配置
 if [ -f "$NGINX_TEMPLATE" ]; then
     silent sed -e "s/{{DOMAIN}}/$DOMAIN/g" \
         -e "s|include /etc/letsencrypt/options-ssl-nginx.conf;|# 内置SSL配置|g" \
@@ -376,20 +391,20 @@ fi
 
 # 重启 Nginx
 silent docker compose restart nginx
+log_info "HTTPS 配置完成，Nginx 已重启"
 
 # 配置证书自动续期
 silent bash -c "(crontab -l 2>/dev/null; echo '0 3 * * * certbot renew --quiet && docker compose -f $PROJECT_DIR/docker-compose.yml restart nginx') | crontab -"
+log_info "SSL 证书自动续期任务已添加"
 
-# ===================== 验证部署结果 =====================
-log_info "验证部署结果..."
-echo "  .env 文件：$(if [ -f "$PROJECT_DIR/.env" ]; then echo "存在"; else echo "不存在"; fi)"
-echo "  构建文件：$(if [ -d "$DIST_DIR" ]; then echo "存在（$(ls -A "$DIST_DIR" | wc -l)个文件）"; else echo "不存在"; fi)"
-echo "  日志目录：$(if [ -d "$PROJECT_DIR/logs" ]; then echo "存在（权限：$(ls -ld "$PROJECT_DIR/logs" | awk '{print $1}')）"; else echo "不存在"; fi)"
-echo "  SSL 证书：$(if [ -f "$CERT_PATH" ]; then echo "存在"; else echo "不存在"; fi)"
+# ===================== 验证部署结果并完成 =====================
+log_step "验证部署结果并完成"
+echo -e "  → .env 文件：$(if [ -f "$PROJECT_DIR/.env" ]; then echo "存在"; else echo "不存在"; fi)"
+echo -e "  → 构建文件：$(if [ -d "$DIST_DIR" ]; then echo "存在（$(ls -A "$DIST_DIR" | wc -l)个文件）"; else echo "不存在"; fi)"
+echo -e "  → 日志目录：$(if [ -d "$PROJECT_DIR/logs" ]; then echo "存在（权限：$(ls -ld "$PROJECT_DIR/logs" | awk '{print $1}')）"; else echo "不存在"; fi)"
+echo -e "  → SSL 证书：$(if [ -f "$CERT_PATH" ]; then echo "存在"; else echo "不存在"; fi)"
 
-# ===================== 部署完成 =====================
-log_info "部署完成！"
-echo "  访问地址：https://$DOMAIN"
-echo "  项目路径：$PROJECT_DIR"
-echo "  日志路径：$PROJECT_DIR/logs"
-echo "  容器管理：docker compose ps/logs/restart"
+echo -e "\033[32m✅ 部署完成！\033[0m"
+echo -e "  访问地址：https://$DOMAIN"
+echo -e "  项目路径：$PROJECT_DIR"
+echo -e "  容器管理：docker compose ps/logs/restart"
