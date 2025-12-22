@@ -186,6 +186,7 @@ build_frontend() {
 
   [[ -f "$DIST_DIR/index.html" ]] || die "前端构建失败：$DIST_DIR/index.html 不存在（dist 为空）"
   ok "前端构建完成：$DIST_DIR"
+  cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
 }
 
 write_nginx_http_only() {
@@ -363,7 +364,6 @@ ensure_dirs
 
 # 1) build dist（否则 nginx 403/默认页）
 build_frontend
-cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
 
 # 2) 先写 HTTP-only nginx.conf，避免 HTTPS 证书缺失导致 nginx 崩
 write_nginx_http_only "$DOMAIN"
