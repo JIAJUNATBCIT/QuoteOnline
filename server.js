@@ -156,3 +156,7 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('未处理的 Promise 拒绝', { reason: reason.toString() });
 });
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', timestamp: new Date() });
+});
