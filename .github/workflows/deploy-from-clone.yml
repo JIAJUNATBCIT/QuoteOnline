@@ -14,39 +14,73 @@ jobs:
     environment: production
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Generate .env from GitHub Environment
+        shell: bash
         run: |
+          set -euo pipefail
+
+          DOMAIN="${{ github.event.inputs.domain }}"
+          if [[ -z "$DOMAIN" ]]; then
+            echo "domain is empty"
+            exit 1
+          fi
+
           cat > .env <<EOF
-NODE_ENV=production
-PORT=3000
-FRONTEND_URL=https://${{ github.event.inputs.domain }}
-UPLOAD_PATH=./uploads
-MAX_FILE_SIZE=10485760
+          NODE_ENV=production
+          PORT=3000
+          FRONTEND_URL=https://${DOMAIN}
+          UPLOAD_PATH=./uploads
+          MAX_FILE_SIZE=10485760
 
-# ===== Secrets =====
-MONGODB_URI=${{ secrets.MONGODB_URI }}
-JWT_SECRET=${{ secrets.JWT_SECRET }}
-JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-EMAIL_PASS=${{ secrets.EMAIL_PASS }}
-MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
+          # ===== Secrets =====
+          MONGODB_URI=${{ secrets.MONGODB_URI }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+          EMAIL_PASS=${{ secrets.EMAIL_PASS }}
+          MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
 
-# ===== Vars =====
-EMAIL_FROM=${{ vars.EMAIL_FROM }}
-EMAIL_HOST=${{ vars.EMAIL_HOST }}
-EMAIL_PORT=${{ vars.EMAIL_PORT }}
-ENABLE_QUOTE_EMAIL_NOTIFICATIONS=${{ vars.ENABLE_QUOTE_EMAIL_NOTIFICATIONS }}
-MAILGUN_DOMAIN=${{ vars.MAILGUN_DOMAIN }}
-EOF
+          # ===== Vars =====
+          EMAIL_FROM=${{ vars.EMAIL_FROM }}
+          EMAIL_HOST=${{ vars.EMAIL_HOST }}
+          EMAIL_PORT=${{ vars.EMAIL_PORT }}
+          ENABLE_QUOTE_EMAIL_NOTIFICATIONS=${{ vars.ENABLE_QUOTE_EMAIL_NOTIFICATIONS }}
+          MAILGUN_DOMAIN=${{ vars.MAILGUN_DOMAIN }}
+          EOF
 
-      - name: Upload .env to server
+          # basic sanity check (avoid empty secrets accidentally)
+          grep -q "^MONGODB_URI=" .env || (echo "MONGODB_URI missing" && exit 1)
+
+      - name: Upload .env and restart services
+        shell: bash
         env:
           SERVER_IP: ${{ secrets.SERVER_RESERVED_IP }}
           SERVER_PASS: ${{ secrets.SERVER_PASS }}
           PROJECT_DIR: /var/www/QuoteOnline
         run: |
-          sudo apt update -y
-          sudo apt install -y sshpass
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y sshpass
 
+          # Upload .env
           sshpass -p "$SERVER_PASS" scp \
             -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
             .env root@$SERVER_IP:$PROJECT_DIR/.env
+
+          # Apply + restart (make sure containers pick up new env)
+          sshpass -p "$SERVER_PASS" ssh \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            root@$SERVER_IP "bash -lc '
+              set -e
+              cd \"$PROJECT_DIR\"
+              test -f .env
+              chmod 600 .env
+
+              # If compose not up yet, bring it up; then restart to load new env
+              docker compose up -d
+              docker compose restart backend nginx || docker compose restart
+            '"
