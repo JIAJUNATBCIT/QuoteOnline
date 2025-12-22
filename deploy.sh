@@ -175,7 +175,7 @@ build_frontend() {
 
   # 安装依赖：优先 ci（更稳定），失败再 fallback install
   npm ci --legacy-peer-deps --no-audit --no-fund || npm install --legacy-peer-deps --no-audit --no-fund
-
+  cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
   # 直接跑 build:optimized（你项目里有这个脚本），并明确 --no-interactive
   # 如果未来你删了 build:optimized，也会自动 fallback 到 ng build production
   if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)"; then
@@ -186,7 +186,6 @@ build_frontend() {
 
   [[ -f "$DIST_DIR/index.html" ]] || die "前端构建失败：$DIST_DIR/index.html 不存在（dist 为空）"
   ok "前端构建完成：$DIST_DIR"
-  cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
 }
 
 write_nginx_http_only() {
