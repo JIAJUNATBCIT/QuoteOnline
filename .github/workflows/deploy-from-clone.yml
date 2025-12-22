@@ -32,7 +32,6 @@ jobs:
           JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
           EMAIL_PASS=${{ secrets.EMAIL_PASS }}
           MAILGUN_API_KEY=${{ secrets.MAILGUN_API_KEY }}
-          SERVER_PASS=${{ secrets.SERVER_PASS }}
 
           # 非敏感信息（从 GitHub Environment Variables 读取）
           EMAIL_FROM=${{ vars.EMAIL_FROM }}
