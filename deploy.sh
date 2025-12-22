@@ -1,5 +1,4 @@
 #!/bin/bash
-# 强制关闭调试模式，消除+号输出；保留错误退出
 set +x
 set -e
 
@@ -20,31 +19,37 @@ TOTAL_STEPS=10
 CURRENT_STEP=0
 
 # ===================== 日志函数（带进度，无重复）=====================
-# 进度信息函数
 log_step() {
     CURRENT_STEP=$((CURRENT_STEP + 1))
     echo -e "\033[32m[${CURRENT_STEP}/${TOTAL_STEPS}] $1\033[0m"
 }
 
-# 普通信息函数（次级提示）
 log_info() {
     echo -e "  → $1"
 }
 
-# 警告函数
 log_warn() {
     echo -e "\033[33m[WARN] $1\033[0m"
 }
 
-# 错误函数
 log_error() {
     echo -e "\033[31m[ERROR] $1\033[0m"
     exit 1
 }
 
-# ===================== 终极静默函数（覆盖所有场景）=====================
+# ===================== 静默函数（增加错误捕获）=====================
 silent() {
     (set +x; "$@") > /dev/null 2>&1
+}
+
+# 带错误捕获的命令执行函数（用于关键命令）
+run_with_error() {
+    log_info "$2"
+    if (set +x; "$1") > /dev/null 2>&1; then
+        log_info "$3"
+    else
+        log_error "$4"
+    fi
 }
 
 # ===================== 用户输入参数 =====================
@@ -88,19 +93,25 @@ log_info "系统依赖安装完成"
 
 # ===================== 安装 Node.js 和 Angular CLI =====================
 log_step "安装 Node.js 和 Angular CLI"
-# 安装 Node.js LTS 20.x
-if ! command -v node &>/dev/null; then
-    log_info "安装 Node.js 20.x..."
+# 安装 Node.js LTS 20.x（强制升级，避免旧版本残留）
+if ! command -v node &>/dev/null || [[ $(node -v | cut -d'v' -f2 | cut -d'.' -f1) -lt 20 ]]; then
+    log_info "安装/升级 Node.js 20.x..."
     silent bash -c "$(curl -fsSL https://deb.nodesource.com/setup_20.x)"
-    silent apt install -y nodejs
+    silent apt install -y nodejs --reinstall
+    log_info "Node.js 20.x 安装完成（版本：$(node -v | awk -F'v' '{print $2}')）"
 else
     log_info "Node.js 已安装（版本：$(node -v | awk -F'v' '{print $2}')）"
 fi
 
-# 安装 Angular CLI
+# 安装 Angular CLI（解决权限和网络问题）
 if ! command -v ng &>/dev/null; then
-    log_info "安装 Angular CLI..."
-    silent npm install -g @angular/cli
+    log_info "安装 Angular CLI（使用淘宝镜像）..."
+    # 切换淘宝镜像，添加权限参数
+    if npm install -g @angular/cli --registry=https://registry.npmmirror.com --unsafe-perm; then
+        log_info "Angular CLI 安装完成"
+    else
+        log_error "Angular CLI 安装失败，请检查网络或权限"
+    fi
 else
     log_info "Angular CLI 已安装（版本：$(ng version --no-progress | grep "Angular CLI" | awk '{print $3}')）"
 fi
