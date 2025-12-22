@@ -370,6 +370,11 @@ write_nginx_http_only "$DOMAIN"
 # 3) 关键：先生成占位 .env，避免 compose 因 env_file 缺失直接失败
 ensure_stub_env
 
+# 8) 触发 workflow 下发真实 .env，等待覆盖，然后 up + restart 让容器加载真实 env
+trigger_workflow "$GITHUB_PAT" "$DOMAIN"
+wait_for_env_nonplaceholder
+compose_restart_all
+
 # 4) 启动容器（HTTP 模式），让 webroot 验证可以被公网访问
 compose_up_http
 
@@ -382,11 +387,6 @@ obtain_cert_webroot_test "$DOMAIN"
 # 7) 切换 HTTPS nginx.conf，并重启 nginx
 write_nginx_https_from_template "$DOMAIN"
 restart_nginx_container
-
-# 8) 触发 workflow 下发真实 .env，等待覆盖，然后 up + restart 让容器加载真实 env
-trigger_workflow "$GITHUB_PAT" "$DOMAIN"
-wait_for_env_nonplaceholder
-compose_restart_all
 
 # 9) 自动续期
 setup_renew_cron
