@@ -241,11 +241,10 @@ clone_project() {
         git clone "https://$GITHUB_USERNAME:$GITHUB_PAT@github.com/$GITHUB_USERNAME/$GITHUB_REPO.git" "$PROJECT_DIR" > /dev/null 2>&1
     fi
 
-    # 创建日志和上传目录
+    # 创建日志和上传目录（优化重复chown命令）
     log_info "创建日志和上传目录..."
     mkdir -p "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
     chmod -R 755 "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
-    chown -R root:root "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
     chown -R 1000:1000 "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads"
 
     # 创建空的 .env 文件
@@ -324,7 +323,7 @@ EOF_GENERATE_ENV
     log_success "环境配置脚本生成完成"
 }
 
-# ===================== 触发 GitHub Workflow =====================
+# ===================== 触发 GitHub Workflow（核心修改：增加状态校验）=====================
 trigger_workflow() {
     log_step "触发 GitHub Actions Workflow"
 
@@ -342,25 +341,73 @@ trigger_workflow() {
         }')
 
     log_info "发送触发请求..."
-    RESPONSE=$(curl -s -X POST \
+    # 发送触发请求（忽略响应，重点在后续查询状态）
+    curl -s -X POST \
         -H "Authorization: token $GITHUB_PAT" \
         -H "Accept: application/vnd.github.v3+json" \
         -H "Content-Type: application/json" \
         "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/workflows/$WORKFLOW_ID/dispatches" \
-        -d "$JSON_PAYLOAD")
+        -d "$JSON_PAYLOAD" > /dev/null 2>&1
 
-    # 结果判断
-    if [ -z "$RESPONSE" ] || echo "$RESPONSE" | jq -e '.id' &>/dev/null; then
-        log_info "等待 Workflow 同步 .env 文件（15秒）..."
-        sleep 15
-        log_success "GitHub Workflow 触发成功"
+    # 等待 Workflow 被调度
+    log_info "等待 Workflow 被调度..."
+    sleep 5
+
+    # 获取最新的 Workflow 运行 ID
+    RUN_ID=$(curl -s \
+        -H "Authorization: token $GITHUB_PAT" \
+        -H "Accept: application/vnd.github.v3+json" \
+        "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/runs?status=in_progress&per_page=1" \
+        | jq -r '.workflow_runs[0].id // "null"')
+
+    if [ "$RUN_ID" = "null" ] || [ -z "$RUN_ID" ]; then
+        log_warn "未获取到 Workflow 运行 ID，使用默认等待策略（60秒）"
+        sleep 60
     else
-        log_warn "Workflow 触发返回异常信息：$RESPONSE"
+        # 循环查询 Workflow 状态，直到完成
+        log_info "开始监控 Workflow 运行（ID：$RUN_ID）..."
+        while true; do
+            # 获取运行状态和结果
+            RUN_STATUS=$(curl -s \
+                -H "Authorization: token $GITHUB_PAT" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/runs/$RUN_ID" \
+                | jq -r '.status // "unknown"')
+            RUN_CONCLUSION=$(curl -s \
+                -H "Authorization: token $GITHUB_PAT" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/$GITHUB_USERNAME/$GITHUB_REPO/actions/runs/$RUN_ID" \
+                | jq -r '.conclusion // "unknown"')
+
+            log_info "Workflow 状态：$RUN_STATUS，结果：$RUN_CONCLUSION"
+
+            # 状态为 completed 时退出循环
+            if [ "$RUN_STATUS" = "completed" ]; then
+                if [ "$RUN_CONCLUSION" = "success" ]; then
+                    log_success "Workflow 执行成功"
+                else
+                    log_warn "Workflow 执行失败（结果：$RUN_CONCLUSION），使用本地兜底 .env 文件"
+                fi
+                break
+            fi
+
+            # 避免无限循环，最多等待10分钟
+            if [ $((SECONDS / 60)) -ge 10 ]; then
+                log_warn "Workflow 运行超时（10分钟），强制退出监控"
+                break
+            fi
+
+            sleep 10  # 每10秒查询一次
+        done
     fi
+
+    # 同步 Workflow 生成的 .env 文件
+    log_info "同步最新的代码和 .env 文件..."
+    cd "$PROJECT_DIR" && git pull origin main > /dev/null 2>&1 || log_warn "代码同步失败，使用本地文件"
 
     # 环境变量兜底
     log_info "检查 .env 文件..."
-    if [ -f "$PROJECT_DIR/.env" ]; then
+    if [ -f "$PROJECT_DIR/.env" ] && [ -s "$PROJECT_DIR/.env" ]; then
         chmod 600 "$PROJECT_DIR/.env"
         log_success ".env 文件存在，权限已设置"
     else
@@ -388,9 +435,26 @@ EOF
     fi
 }
 
-# ===================== 配置 Nginx 并启动服务 =====================
+# ===================== 配置 Nginx 并启动服务（核心修改：增加.env校验）=====================
 config_nginx() {
     log_step "配置 Nginx 并启动服务"
+
+    # 校验 .env 文件有效性
+    log_info "校验 .env 文件有效性..."
+    if ! grep -q "MAILGUN_API_KEY=" "$PROJECT_DIR/.env" || ! grep -q "MAILGUN_DOMAIN=" "$PROJECT_DIR/.env"; then
+        log_warn ".env 文件缺少关键变量，自动补充默认值"
+        # 确保变量存在
+        if ! grep -q "MAILGUN_API_KEY=" "$PROJECT_DIR/.env"; then
+            echo "MAILGUN_API_KEY=your_mailgun_api_key" >> "$PROJECT_DIR/.env"
+        fi
+        if ! grep -q "MAILGUN_DOMAIN=" "$PROJECT_DIR/.env"; then
+            echo "MAILGUN_DOMAIN=your_mailgun_domain" >> "$PROJECT_DIR/.env"
+        fi
+    else
+        # 替换空值
+        sed -i 's/^MAILGUN_API_KEY=$/MAILGUN_API_KEY=your_mailgun_api_key/' "$PROJECT_DIR/.env"
+        sed -i 's/^MAILGUN_DOMAIN=$/MAILGUN_DOMAIN=your_mailgun_domain/' "$PROJECT_DIR/.env"
+    fi
 
     log_info "创建 Nginx 配置目录..."
     mkdir -p "$PROJECT_DIR/client"
@@ -429,10 +493,17 @@ server {
 }
 EOF
 
-    # 修正 Docker Compose 配置
+    # 修正 Docker Compose 配置（增加去重逻辑）
     log_info "修正 Docker Compose 配置..."
     sed -i '/^version/d' "$DOCKER_COMPOSE_FILE" 2>/dev/null
-    sed -i '/services.backend/a \    env_file: .env' "$DOCKER_COMPOSE_FILE" 2>/dev/null
+    if ! grep -q "env_file: .env" "$DOCKER_COMPOSE_FILE"; then
+        sed -i '/services.backend/a \    env_file: .env' "$DOCKER_COMPOSE_FILE" 2>/dev/null
+    fi
+
+    # 为后端服务添加启动延迟（修改 docker-compose.yml）
+    if ! grep -q "command: sh -c \"sleep 2 && NODE_ENV=production node server.js\"" "$DOCKER_COMPOSE_FILE"; then
+        sed -i '/services.backend/a \    command: sh -c "sleep 2 && NODE_ENV=production node server.js"' "$DOCKER_COMPOSE_FILE" 2>/dev/null
+    fi
 
     # 启动容器
     log_info "启动 Docker 容器..."
@@ -450,7 +521,7 @@ EOF
         fi
     fi
 
-    # 申请 SSL 证书
+    # 申请 SSL 证书（生产环境请移除 --test-cert）
     log_info "申请 SSL 证书..."
     mkdir -p "$WEBROOT_PATH/.well-known/acme-challenge"
     chmod 755 "$WEBROOT_PATH/.well-known/acme-challenge"
