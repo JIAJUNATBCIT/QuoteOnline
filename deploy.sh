@@ -18,13 +18,18 @@ DIST_DIR="$CLIENT_DIR/dist/quote-online-client"
 NGINX_TEMPLATE="$CLIENT_DIR/nginx.conf.template"
 NGINX_CONF="$CLIENT_DIR/nginx.conf"
 
-log() { echo -e "▶ $*"; }
-ok()  { echo -e "✅ $*"; }
-warn(){ echo -e "⚠️  $*" >&2; }
-die() { echo -e "❌ $*" >&2; exit 1; }
+# -----------------------------
+# helpers
+# -----------------------------
+log()  { echo -e "▶ $*"; }
+ok()   { echo -e "✅ $*"; }
+warn() { echo -e "⚠️  $*" >&2; }
+die()  { echo -e "❌ $*" >&2; exit 1; }
 
 need_root() {
-  [[ "$(id -u)" -eq 0 ]] || die "请用 root 运行（或 sudo -i 后再执行）。"
+  if [[ "$(id -u)" -ne 0 ]]; then
+    die "请用 root 运行（或 sudo -i 后再执行）。"
+  fi
 }
 
 detect_pkg_mgr() {
@@ -42,25 +47,30 @@ install_deps() {
     apt update -y
     apt install -y git curl jq ca-certificates gnupg lsb-release openssl certbot
   else
+    # CentOS/RHEL/Rocky/Alma
     $mgr install -y epel-release || true
     $mgr install -y git curl jq ca-certificates openssl || true
+    # certbot on EL9 sometimes requires python3-certbot-nginx or snap; try best effort
     $mgr install -y certbot || $mgr install -y certbot python3-certbot-nginx || true
   fi
 
+  # Docker
   if ! command -v docker >/dev/null 2>&1; then
     log "安装 Docker..."
     curl -fsSL https://get.docker.com | sh
   fi
   systemctl enable --now docker >/dev/null 2>&1 || true
 
+  # docker compose plugin
   if ! docker compose version >/dev/null 2>&1; then
     log "安装 docker compose plugin..."
     mkdir -p /usr/local/lib/docker/cli-plugins
-    curl -fsSL "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64" \
+    curl -SL "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64" \
       -o /usr/local/lib/docker/cli-plugins/docker-compose
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
   fi
 
+  # Node + Angular CLI（为了本机 build 前端，避免 dist 为空导致 403）
   if ! command -v node >/dev/null 2>&1; then
     log "安装 Node.js 20..."
     if [[ "$mgr" == "apt" ]]; then
@@ -85,14 +95,18 @@ free_ports() {
   systemctl stop nginx >/dev/null 2>&1 || true
   systemctl stop apache2 >/dev/null 2>&1 || true
   systemctl stop httpd >/dev/null 2>&1 || true
+
+  # 停掉占用 80/443 的 docker 容器
   docker ps -q --filter "publish=80"  | xargs -r docker stop || true
   docker ps -q --filter "publish=443" | xargs -r docker stop || true
+
   ok "端口处理完成"
 }
 
 clone_repo() {
   local pat="$1"
   log "同步项目代码到 $PROJECT_DIR ..."
+
   mkdir -p /var/www
   cd /var/www
 
@@ -110,13 +124,70 @@ clone_repo() {
   ok "代码同步完成"
 }
 
+ensure_dirs() {
+  mkdir -p "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads" || true
+  chmod -R 755 "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads" || true
+}
+
+ensure_stub_env() {
+  # 关键：让 docker compose 永远不会因 env_file 缺失而失败
+  local env_path="$PROJECT_DIR/.env"
+  if [[ -f "$env_path" ]]; then
+    return
+  fi
+
+  log "创建占位 .env（等待 GitHub Actions 覆盖）..."
+  cat > "$env_path" <<EOF
+NODE_ENV=production
+PORT=3000
+FRONTEND_URL=https://${DOMAIN}
+UPLOAD_PATH=./uploads
+MAX_FILE_SIZE=10485760
+
+# placeholders (will be overwritten by GitHub Actions)
+MONGODB_URI=placeholder
+JWT_SECRET=placeholder
+JWT_REFRESH_SECRET=placeholder
+EMAIL_PASS=placeholder
+MAILGUN_API_KEY=placeholder
+
+EMAIL_FROM=placeholder
+EMAIL_HOST=placeholder
+EMAIL_PORT=465
+ENABLE_QUOTE_EMAIL_NOTIFICATIONS=true
+MAILGUN_DOMAIN=placeholder
+EOF
+  chmod 600 "$env_path" || true
+  ok "占位 .env 已创建：$env_path"
+}
+
+build_frontend() {
+  # 你的 compose 会把 dist 挂进 nginx，dist 为空就会 403/默认页
+  log "构建 Angular 前端（保证 dist 不为空）..."
+  cd "$CLIENT_DIR"
+
+  [[ -f package.json ]] || die "未找到 $CLIENT_DIR/package.json，无法构建前端"
+
+  # 优先 npm ci，其次 npm install（兼容）
+  npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+
+  # 构建：尽量用 ng build production
+  if npm run | grep -q "build:optimized"; then
+    npm run build:optimized
+  else
+    ng build --configuration production
+  fi
+
+  [[ -f "$DIST_DIR/index.html" ]] || die "前端构建失败：$DIST_DIR/index.html 不存在（dist 为空）"
+  ok "前端构建完成：$DIST_DIR"
+}
+
 write_nginx_http_only() {
   local domain="$1"
   local domain_www="www.${domain}"
 
   log "生成 Nginx HTTP-only 配置（用于 certbot webroot 验证）..."
 
-  mkdir -p "$CLIENT_DIR"
   mkdir -p "$DIST_DIR/.well-known/acme-challenge"
   chmod -R 755 "$DIST_DIR/.well-known" || true
 
@@ -133,12 +204,6 @@ server {
     try_files \$uri =404;
   }
 
-  location /health {
-    access_log off;
-    return 200 "healthy\\n";
-    add_header Content-Type text/plain;
-  }
-
   location /api/ {
     proxy_pass http://backend:3000/api/;
     proxy_set_header Host \$host;
@@ -150,83 +215,43 @@ server {
   location / {
     try_files \$uri \$uri/ /index.html;
   }
+
+  location /health {
+    access_log off;
+    return 200 "healthy\\n";
+    add_header Content-Type text/plain;
+  }
 }
 EOF
 
   ok "HTTP-only nginx.conf 已写入：$NGINX_CONF"
 }
 
-build_frontend() {
-  log "构建 Angular 前端（保证 dist 不为空）..."
-  cd "$CLIENT_DIR"
-
-  [[ -f package.json ]] || die "未找到 $CLIENT_DIR/package.json，无法构建前端"
-
-  npm ci --legacy-peer-deps || npm install --legacy-peer-deps
-
-  if npm run | grep -q "build:optimized"; then
-    npm run build:optimized
-  else
-    ng build --configuration production
-  fi
-
-  [[ -f "$DIST_DIR/index.html" ]] || die "前端构建失败：$DIST_DIR/index.html 不存在（dist 为空）"
-  ok "前端构建完成：$DIST_DIR"
-}
-
 compose_up_http() {
-  log "启动容器（HTTP 模式先跑起来）..."
+  log "启动容器（HTTP 模式先跑起来，供 webroot 验证）..."
   cd "$PROJECT_DIR"
   docker compose down || true
   docker compose up -d --build
   ok "容器启动完成"
 }
 
-trigger_workflow() {
-  local pat="$1"
-  local domain="$2"
-  log "触发 GitHub Actions（下发 .env）..."
-
-  curl -fsSL -X POST \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${pat}" \
-    "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches" \
-    -d @- <<EOF >/dev/null
-{
-  "ref": "main",
-  "inputs": {
-    "domain": "${domain}"
-  }
-}
-EOF
-
-  ok "Workflow 已触发"
+dns_check() {
+  local domain="$1"
+  log "检查 DNS 解析（避免 NXDOMAIN）..."
+  if ! getent ahosts "$domain" >/dev/null 2>&1; then
+    die "DNS 未解析：$domain（请先把 A 记录指到本机公网/Reserved IP，等待生效后再跑）"
+  fi
+  ok "DNS 解析正常"
 }
 
-wait_for_env() {
-  log "等待 GitHub Actions 下发 .env ..."
-  local env_path="$PROJECT_DIR/.env"
-  local i=0
-  while [[ ! -s "$env_path" ]]; do
-    i=$((i+1))
-    [[ $i -le 90 ]] || die "等待超时：$env_path 仍不存在或为空（请检查 workflow 是否成功 scp）"
-    sleep 2
-  done
-  chmod 600 "$env_path" || true
-  ok ".env 已就绪：$env_path"
-}
-
-obtain_cert_webroot() {
+obtain_cert_webroot_test() {
   local domain="$1"
   local domain_www="www.${domain}"
 
-  log "申请 SSL 证书（webroot 模式，保留 --test-cert）..."
+  log "申请 SSL 证书（webroot + --test-cert）..."
+
   mkdir -p "$DIST_DIR/.well-known/acme-challenge"
   chmod -R 755 "$DIST_DIR/.well-known" || true
-
-  if ! getent ahosts "$domain" >/dev/null 2>&1; then
-    die "DNS 未解析：$domain（请先把 A 记录指向本机公网 IP / reserved IP，等待生效）"
-  fi
 
   certbot certonly --webroot \
     -w "$DIST_DIR" \
@@ -235,13 +260,15 @@ obtain_cert_webroot() {
     --test-cert
 
   [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" ]] || die "证书文件不存在，申请失败"
-  ok "证书申请成功：/etc/letsencrypt/live/${domain}/"
+  ok "测试证书申请成功：/etc/letsencrypt/live/${domain}/"
 }
 
 write_nginx_https_from_template() {
   local domain="$1"
   log "生成 HTTPS nginx.conf（基于模板替换 {{DOMAIN}}）..."
+
   [[ -f "$NGINX_TEMPLATE" ]] || die "找不到模板：$NGINX_TEMPLATE"
+
   sed "s/{{DOMAIN}}/${domain}/g" "$NGINX_TEMPLATE" > "$NGINX_CONF"
   ok "HTTPS nginx.conf 已生成：$NGINX_CONF"
 }
@@ -259,19 +286,64 @@ setup_renew_cron() {
   ok "自动续期已设置"
 }
 
+trigger_workflow() {
+  local pat="$1"
+  local domain="$2"
+
+  log "触发 GitHub Actions（下发 .env）..."
+  curl -fsSL -X POST \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${pat}" \
+    "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches" \
+    -d @- >/dev/null <<EOF
+{
+  "ref": "main",
+  "inputs": { "domain": "${domain}" }
+}
+EOF
+  ok "Workflow 已触发"
+}
+
+wait_for_env_nonplaceholder() {
+  # 等待 workflow 覆盖（非空且 MONGODB_URI 不再是 placeholder）
+  log "等待 GitHub Actions 下发真实 .env ..."
+  local env_path="$PROJECT_DIR/.env"
+  local i=0
+  while true; do
+    i=$((i+1))
+    if [[ -s "$env_path" ]] && grep -q '^MONGODB_URI=' "$env_path" && ! grep -q '^MONGODB_URI=placeholder' "$env_path"; then
+      chmod 600 "$env_path" || true
+      ok "真实 .env 已就绪：$env_path"
+      return
+    fi
+    if [[ $i -gt 150 ]]; then
+      die "等待超时：workflow 可能未成功 scp .env 到服务器（请去 GitHub Actions 看日志）"
+    fi
+    sleep 2
+  done
+}
+
+compose_restart_all() {
+  log "确保容器加载新 .env（up + restart）..."
+  cd "$PROJECT_DIR"
+  docker compose up -d
+  docker compose restart backend nginx || docker compose restart
+  ok "服务已重启并加载新配置"
+}
+
 # -----------------------------
 # main
 # -----------------------------
 need_root
 
 log "读取部署参数"
-read -r -p "请输入域名（例如 portal.ooishipping.com）: " DOMAIN
+read -p "请输入域名（例如 portal.ooishipping.com）: " DOMAIN
 [[ -n "${DOMAIN}" ]] || die "DOMAIN 不能为空"
 if [[ ! "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
   die "域名格式不合法：$DOMAIN"
 fi
 
-read -r -s -p "请输入 GitHub PAT（repo 权限 + 能触发 workflow 更好）: " GITHUB_PAT
+read -s -p "请输入 GitHub PAT（需要 repo 权限，建议也有 workflow 权限）: " GITHUB_PAT
 echo ""
 [[ -n "${GITHUB_PAT}" ]] || die "GitHub PAT 不能为空"
 
@@ -279,17 +351,36 @@ PKG_MGR="$(detect_pkg_mgr)"
 install_deps "$PKG_MGR"
 free_ports
 clone_repo "$GITHUB_PAT"
+ensure_dirs
 
-write_nginx_http_only "$DOMAIN"
+# 1) build dist（否则 nginx 403/默认页）
 build_frontend
+
+# 2) 先写 HTTP-only nginx.conf，避免 HTTPS 证书缺失导致 nginx 崩
+write_nginx_http_only "$DOMAIN"
+
+# 3) 关键：先生成占位 .env，避免 compose 因 env_file 缺失直接失败
+ensure_stub_env
+
+# 4) 启动容器（HTTP 模式），让 webroot 验证可以被公网访问
 compose_up_http
 
-trigger_workflow "$GITHUB_PAT" "$DOMAIN"
-wait_for_env
+# 5) DNS 检查（避免 NXDOMAIN）
+dns_check "$DOMAIN"
 
-obtain_cert_webroot "$DOMAIN"
+# 6) 申请测试证书（--test-cert）
+obtain_cert_webroot_test "$DOMAIN"
+
+# 7) 切换 HTTPS nginx.conf，并重启 nginx
 write_nginx_https_from_template "$DOMAIN"
 restart_nginx_container
+
+# 8) 触发 workflow 下发真实 .env，等待覆盖，然后 up + restart 让容器加载真实 env
+trigger_workflow "$GITHUB_PAT" "$DOMAIN"
+wait_for_env_nonplaceholder
+compose_restart_all
+
+# 9) 自动续期
 setup_renew_cron
 
 echo ""

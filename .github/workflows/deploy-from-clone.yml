@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       domain:
-        description: "部署域名（例如 portal.ooishipping.com）"
+        description: "部署域名"
         required: true
         type: string
 
@@ -14,16 +14,13 @@ jobs:
     environment: production
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Generate .env from GitHub Environment
         shell: bash
         run: |
           set -euo pipefail
 
           DOMAIN="${{ github.event.inputs.domain }}"
-          [[ -n "$DOMAIN" ]] || { echo "domain is empty"; exit 1; }
+          [[ -n "$DOMAIN" ]] || (echo "domain is empty" && exit 1)
 
           cat > .env <<EOF
           NODE_ENV=production
@@ -47,14 +44,11 @@ jobs:
           MAILGUN_DOMAIN=${{ vars.MAILGUN_DOMAIN }}
           EOF
 
-          # sanity checks: avoid pushing empty env accidentally
-          grep -q '^MONGODB_URI=' .env || { echo "MONGODB_URI missing"; exit 1; }
-          grep -q '^JWT_SECRET=' .env || { echo "JWT_SECRET missing"; exit 1; }
-          grep -q '^JWT_REFRESH_SECRET=' .env || { echo "JWT_REFRESH_SECRET missing"; exit 1; }
-          grep -q '^EMAIL_PASS=' .env || { echo "EMAIL_PASS missing"; exit 1; }
-          grep -q '^MAILGUN_API_KEY=' .env || { echo "MAILGUN_API_KEY missing"; exit 1; }
+          # sanity checks
+          grep -q '^MONGODB_URI=' .env || (echo "MONGODB_URI missing" && exit 1)
+          grep -q '^JWT_SECRET=' .env || (echo "JWT_SECRET missing" && exit 1)
 
-      - name: Upload .env and apply (docker compose up + restart)
+      - name: Upload .env and restart services
         shell: bash
         env:
           SERVER_IP: ${{ secrets.SERVER_RESERVED_IP }}
@@ -69,21 +63,17 @@ jobs:
           sshpass -p "$SERVER_PASS" scp \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
-            .env root@"$SERVER_IP":"$PROJECT_DIR/.env"
+            .env root@$SERVER_IP:$PROJECT_DIR/.env
 
-          # Apply on server: ensure compose is running and reload env by restart
+          # Apply + restart
           sshpass -p "$SERVER_PASS" ssh \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
-            root@"$SERVER_IP" "bash -lc '
+            root@$SERVER_IP "bash -lc '
               set -euo pipefail
               cd \"$PROJECT_DIR\"
               test -s .env
               chmod 600 .env
 
               docker compose up -d
-              # 重启让容器重新加载 .env
-              docker compose restart backend nginx 2>/dev/null || docker compose restart
-
-              docker compose ps
-            '"
+              docker compose restart backend nginx || docker compose restart'"
