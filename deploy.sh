@@ -23,8 +23,8 @@ DIST_DIR="$CLIENT_DIR/dist/quote-online-client"
 NGINX_TEMPLATE="$CLIENT_DIR/nginx.conf.template"
 NGINX_CONF="$CLIENT_DIR/nginx.conf"
 # 超时配置
-WAIT_ENV_TIMEOUT=120  # 等待.env的超时时间（秒），从300秒缩短到120秒
-DOCKER_BUILD_PARALLEL=2  # Docker构建并行数（根据CPU核心数调整）
+WAIT_ENV_TIMEOUT=120  # 等待.env的超时时间（秒）
+DOCKER_BUILD_PARALLEL=2  # Docker构建并行数（仅用于前端构建）
 
 # -----------------------------
 # 工具函数（优化日志+错误处理）
@@ -253,6 +253,9 @@ build_frontend() {
 
   # 缓存node_modules（使用本地缓存，避免重复下载）
   local node_modules_cache="$HOME/.npm-cache/quoteonline-node_modules"
+  # 修复：先创建缓存目录的父目录
+  mkdir -p "$HOME/.npm-cache" || true
+
   if [[ ! -d "$node_modules_cache" ]]; then
     # 安装依赖
     npm ci --registry=https://registry.npmmirror.com --no-audit --no-fund >/dev/null 2>&1 || \
@@ -267,7 +270,7 @@ build_frontend() {
   # 复制环境文件
   cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts" || true
 
-  # 构建优化：使用并行构建
+  # 构建优化：使用并行构建（仅Angular构建使用，避免Docker Compose的--parallel冲突）
   if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)" >/dev/null 2>&1; then
     npm run -s build:optimized -- --no-interactive --parallel "$DOCKER_BUILD_PARALLEL"
   else
@@ -321,7 +324,7 @@ EOF
   ok "HTTP-only nginx.conf 已写入：$NGINX_CONF"
 }
 
-# 启动容器（优化：使用--no-cache避免缓存问题，仅在首次构建时构建）
+# 启动容器（修复：移除不支持的--parallel标志）
 compose_up_http() {
   log "启动容器（HTTP 模式先跑起来，供 webroot 验证）..."
   cd "$PROJECT_DIR" || exit 1
@@ -329,7 +332,8 @@ compose_up_http() {
   local build_flag="$PROJECT_DIR/.docker_build_done"
   if [[ ! -f "$build_flag" ]]; then
     docker compose down || true
-    docker compose up -d --build --parallel "$DOCKER_BUILD_PARALLEL"
+    # 修复：移除--parallel标志，兼容老版本Docker Compose
+    docker compose up -d --build
     touch "$build_flag"
   else
     docker compose down || true
