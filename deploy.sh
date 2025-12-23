@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
+# 仅保留安全选项，彻底移除调试模式（-x）
 set -euo pipefail
 
-# 启用终端颜色支持（仅用于业务日志颜色）
+# 强制关闭所有调试输出（兜底）
+set +x >/dev/null 2>&1 || true
+
+# 启用终端颜色支持
 export TERM=xterm-256color
 
-# 打印启动标题（业务日志）
+# 打印启动标题（仅一次）
 echo "=========================================="
 echo "  QuoteOnline One-Click Deploy (Stable)"
 echo "  Bridge network + webroot TLS + GH env"
@@ -13,7 +17,7 @@ echo "=========================================="
 echo ""
 
 # -----------------------------
-# 配置常量（集中管理，方便修改）
+# 配置常量
 # -----------------------------
 PROJECT_DIR="/var/www/QuoteOnline"
 REPO_OWNER="JIAJUNATBCIT"
@@ -23,19 +27,18 @@ CLIENT_DIR="$PROJECT_DIR/client"
 DIST_DIR="$CLIENT_DIR/dist/quote-online-client"
 NGINX_TEMPLATE="$CLIENT_DIR/nginx.conf.template"
 NGINX_CONF="$CLIENT_DIR/nginx.conf"
-# 超时配置
-WAIT_ENV_TIMEOUT=120  # 等待.env的超时时间（秒）
-DOCKER_BUILD_PARALLEL=2  # Docker构建并行数（仅用于前端构建）
-NETWORK_RETRY=3  # 网络创建重试次数
-NETWORK_WAIT=2   # 网络操作等待时间（秒）
+WAIT_ENV_TIMEOUT=120
+DOCKER_BUILD_PARALLEL=2
+NETWORK_RETRY=3
+NETWORK_WAIT=2
 
 # -----------------------------
-# 工具函数（仅保留业务日志，无调试输出）
+# 工具函数（仅输出业务日志，无调试）
 # -----------------------------
-log()  { echo -e "\033[34m▶ $*\033[0m"; }  # 普通流程日志（蓝色）
-ok()   { echo -e "\033[32m✅ $*\033[0m"; }  # 成功日志（绿色）
-warn() { echo -e "\033[33m⚠️  $*\033[0m" >&2; }  # 警告日志（黄色，输出到stderr）
-die()  { echo -e "\033[31m❌ $*\033[0m" >&2; exit 1; }  # 错误日志（红色，输出到stderr并退出）
+log()  { echo -e "\033[34m▶ $*\033[0m"; }
+ok()   { echo -e "\033[32m✅ $*\033[0m"; }
+warn() { echo -e "\033[33m⚠️  $*\033[0m" >&2; }
+die()  { echo -e "\033[31m❌ $*\033[0m" >&2; exit 1; }
 
 # 检查root权限
 need_root() {
@@ -44,7 +47,7 @@ need_root() {
   fi
 }
 
-# 检测包管理器（优化返回逻辑，无调试输出）
+# 检测包管理器
 detect_pkg_mgr() {
   local mgr
   for mgr in apt dnf yum; do
@@ -56,12 +59,11 @@ detect_pkg_mgr() {
   die "不支持的系统：未找到 apt/dnf/yum"
 }
 
-# 安装依赖（仅保留核心业务日志，命令输出重定向到null）
+# 安装依赖（所有命令输出重定向）
 install_deps() {
   local mgr="$1"
   log "安装系统依赖（$mgr）..."
 
-  # 仅在首次安装时更新源，避免重复更新
   local update_flag="/tmp/.pkg_update_done"
   if [[ ! -f "$update_flag" ]]; then
     if [[ "$mgr" == "apt" ]]; then
@@ -73,14 +75,13 @@ install_deps() {
     touch "$update_flag"
   fi
 
-  # 批量安装依赖（区分系统，命令输出重定向）
   if [[ "$mgr" == "apt" ]]; then
     apt install -y -qq git curl jq ca-certificates gnupg lsb-release openssl certbot python3-certbot-nginx lsof net-tools >/dev/null 2>&1
   else
     $mgr install -y -q git curl jq ca-certificates openssl certbot python3-certbot-nginx lsof net-tools >/dev/null 2>&1 || true
   fi
 
-  # Docker安装（仅保留业务日志，命令输出重定向）
+  # Docker安装
   install_docker() {
     if command -v docker >/dev/null 2>&1; then
       log "Docker 已安装，配置镜像加速"
@@ -107,7 +108,7 @@ EOF
     systemctl daemon-reload && systemctl restart docker >/dev/null 2>&1 || true
   }
 
-  # Docker Compose安装（仅保留业务日志）
+  # Docker Compose安装
   install_docker_compose() {
     if docker compose version >/dev/null 2>&1; then
       log "Docker Compose 已安装，跳过"
@@ -121,7 +122,7 @@ EOF
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
   }
 
-  # Node.js安装（仅保留业务日志）
+  # Node.js安装
   install_node() {
     if command -v node >/dev/null 2>&1; then
       local node_version
@@ -148,7 +149,7 @@ EOF
   install_docker_compose
   install_node
 
-  # Angular CLI安装（仅保留业务日志）
+  # Angular CLI安装
   if ! command -v ng >/dev/null 2>&1; then
     log "安装 Angular CLI（国内镜像）..."
     npm install -g @angular/cli --registry=https://registry.npmmirror.com >/dev/null 2>&1
@@ -159,11 +160,10 @@ EOF
   ok "依赖安装完成"
 }
 
-# 释放端口（仅保留业务日志，命令输出重定向）
+# 释放端口
 free_ports() {
   log "释放 80/443 端口占用..."
 
-  # 停止系统Web服务
   local services=("nginx" "apache2" "httpd")
   for svc in "${services[@]}"; do
     if command -v systemctl >/dev/null 2>&1; then
@@ -173,7 +173,6 @@ free_ports() {
     sudo service "$svc" stop >/dev/null 2>&1 || true
   done
 
-  # 杀死端口占用进程
   if command -v lsof >/dev/null 2>&1; then
     for port in 80 443; do
       local pids
@@ -192,7 +191,6 @@ free_ports() {
     done
   fi
 
-  # 停止占用端口的Docker容器
   if command -v docker >/dev/null 2>&1; then
     if xargs --help 2>&1 | grep -q -- --no-run-if-empty; then
       docker ps -q --filter "publish=80"  | xargs --no-run-if-empty sudo docker stop >/dev/null 2>&1 || true
@@ -206,7 +204,7 @@ free_ports() {
   ok "端口处理完成"
 }
 
-# 克隆代码（仅保留业务日志，命令输出重定向）
+# 克隆代码
 clone_repo() {
   local pat="$1"
   log "同步项目代码到 $PROJECT_DIR ..."
@@ -228,7 +226,7 @@ clone_repo() {
   ok "代码同步完成"
 }
 
-# 创建目录（仅保留业务日志）
+# 创建目录
 ensure_dirs() {
   log "创建必要目录..."
   mkdir -p "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads" "$DIST_DIR/.well-known/acme-challenge" || true
@@ -237,7 +235,7 @@ ensure_dirs() {
   ok "目录创建完成"
 }
 
-# 创建占位.env（仅保留业务日志）
+# 创建占位.env
 ensure_stub_env() {
   local env_path="$PROJECT_DIR/.env"
   if [[ -f "$env_path" && $(grep -c "MONGODB_URI=placeholder" "$env_path") -gt 0 ]]; then
@@ -270,19 +268,17 @@ EOF
   ok "占位 .env 已创建：$env_path"
 }
 
-# 构建前端（仅保留业务日志，命令输出重定向）
+# 构建前端
 build_frontend() {
   log "构建 Angular 前端（保证 dist 不为空）..."
   cd "$CLIENT_DIR" || exit 1
 
   [[ -f package.json ]] || die "未找到 $CLIENT_DIR/package.json，无法构建前端"
 
-  # 环境变量优化
   export CI=1
   export NG_CLI_ANALYTICS=false
   export npm_config_legacy_peer_deps=true
 
-  # 缓存node_modules
   local node_modules_cache="$HOME/.npm-cache/quoteonline-node_modules"
   mkdir -p "$HOME/.npm-cache" || true
 
@@ -294,10 +290,8 @@ build_frontend() {
     cp -r "$node_modules_cache" node_modules || true
   fi
 
-  # 复制环境文件
   cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts" || true
 
-  # 构建前端
   if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)" >/dev/null 2>&1; then
     npm run -s build:optimized -- --no-interactive --parallel "$DOCKER_BUILD_PARALLEL" >/dev/null 2>&1
   else
@@ -308,7 +302,7 @@ build_frontend() {
   ok "前端构建完成：$DIST_DIR"
 }
 
-# 生成HTTP-only Nginx配置（仅保留业务日志）
+# 生成HTTP-only Nginx配置
 write_nginx_http_only() {
   local domain="$1"
   local domain_www="www.${domain}"
@@ -351,14 +345,13 @@ EOF
   ok "HTTP-only nginx.conf 已写入：$NGINX_CONF"
 }
 
-# 安全清理Docker网络（仅保留业务日志）
+# 安全清理Docker网络
 cleanup_docker_network() {
   local network_name="$1"
   local retry=3
   
   if docker network inspect "$network_name" >/dev/null 2>&1; then
     log "清理旧网络：$network_name"
-    # 断开所有容器关联
     local containers
     containers=$(docker network inspect "$network_name" -f '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null || true)
     if [[ -n "$containers" ]]; then
@@ -367,7 +360,6 @@ cleanup_docker_network() {
       done
     fi
     
-    # 重试删除网络
     while [[ $retry -gt 0 ]]; do
       if docker network rm "$network_name" >/dev/null 2>&1; then
         log "旧网络 $network_name 已删除"
@@ -382,7 +374,7 @@ cleanup_docker_network() {
   fi
 }
 
-# 启动容器（仅保留业务日志，命令输出重定向）
+# 启动容器
 compose_up_http() {
   log "启动容器（HTTP 模式先跑起来，供 webroot 验证）..."
   cd "$PROJECT_DIR" || exit 1
@@ -390,11 +382,9 @@ compose_up_http() {
   local network_name="quoteonline_quote-network"
   local retry=$NETWORK_RETRY
   
-  # 清理旧网络
   cleanup_docker_network "$network_name"
   sleep $NETWORK_WAIT
   
-  # 启动容器（带重试）
   local build_flag="$PROJECT_DIR/.docker_build_done"
   while [[ $retry -gt 0 ]]; do
     if [[ ! -f "$build_flag" ]]; then
@@ -419,7 +409,7 @@ compose_up_http() {
   die "容器启动失败（网络错误），已重试${NETWORK_RETRY}次"
 }
 
-# DNS检查（仅保留业务日志）
+# DNS检查
 dns_check() {
   local domain="$1"
   log "检查 DNS 解析（避免 NXDOMAIN）..."
@@ -435,7 +425,7 @@ dns_check() {
   ok "DNS 解析正常"
 }
 
-# 申请证书（仅保留业务日志，关键输出保留）
+# 申请证书
 obtain_cert_webroot_test() {
   local domain="$1"
   local domain_www="www.${domain}"
@@ -466,7 +456,7 @@ obtain_cert_webroot_test() {
   ok "测试证书申请成功：/etc/letsencrypt/live/${domain}/"
 }
 
-# 生成HTTPS Nginx配置（仅保留业务日志）
+# 生成HTTPS Nginx配置
 write_nginx_https_from_template() {
   local domain="$1"
   log "生成 HTTPS nginx.conf（基于模板替换 {{DOMAIN}}）..."
@@ -477,7 +467,7 @@ write_nginx_https_from_template() {
   ok "HTTPS nginx.conf 已生成：$NGINX_CONF"
 }
 
-# 重启Nginx容器（仅保留业务日志）
+# 重启Nginx容器
 restart_nginx_container() {
   log "重启 nginx 容器..."
   cd "$PROJECT_DIR" || exit 1
@@ -485,7 +475,7 @@ restart_nginx_container() {
   ok "nginx 已重启"
 }
 
-# 配置证书自动续期（仅保留业务日志）
+# 配置证书自动续期
 setup_renew_cron() {
   log "配置证书自动续期（cron：每天 03:00 renew + 重启 nginx）..."
   local cron_task="0 3 * * * certbot renew --quiet && cd $PROJECT_DIR && docker compose restart nginx >/dev/null 2>&1"
@@ -495,7 +485,7 @@ setup_renew_cron() {
   ok "自动续期已设置"
 }
 
-# 触发Workflow（仅保留业务日志）
+# 触发Workflow
 trigger_workflow() {
   local pat="$1"
   local domain="$2"
@@ -525,22 +515,29 @@ EOF
   die "Workflow 触发失败，已重试3次"
 }
 
-# 等待真实.env（仅保留业务日志，动态计时）
+# 等待真实.env（核心修复：单行动态计时，无刷屏）
 wait_for_env_nonplaceholder() {
   local env_path="$PROJECT_DIR/.env"
   local i=0
   local interval=1
   local timeout=$WAIT_ENV_TIMEOUT
 
+  # 仅打印一次初始提示
   log "等待 GitHub Actions 下发真实 .env ... (超时时间: ${timeout}秒)"
   
+  # 强制关闭调试模式（兜底）
+  set +x >/dev/null 2>&1
+
+  # 循环检测.env，单行动态刷新
   while true; do
     i=$((i+1))
-    # 检查.env有效性
+    
+    # 检查.env是否有效
     if [[ -s "$env_path" ]]; then
-      if grep -q '^MONGODB_URI=' "$env_path" && ! grep -q '^MONGODB_URI=placeholder' "$env_path"; then
+      if grep -q '^MONGODB_URI=' "$env_path" 2>/dev/null && ! grep -q '^MONGODB_URI=placeholder' "$env_path" 2>/dev/null; then
         chmod 600 "$env_path" || true
-        printf "\r\033[K"  # 清空当前行
+        # 清空当前行并打印成功提示
+        printf "\r\033[K"
         ok "真实 .env 已就绪：$env_path (耗时 ${i}秒)"
         return
       fi
@@ -552,13 +549,13 @@ wait_for_env_nonplaceholder() {
       die "等待超时：workflow 可能未成功 scp .env 到服务器（请去 GitHub Actions 看日志）"
     fi
 
-    # 动态计时
+    # 单行动态刷新计时（覆盖当前行，无换行）
     printf "\r⏳ 等待中... 已耗时 ${i}秒 / 超时 ${timeout}秒"
     sleep $interval
   done
 }
 
-# 重启容器（仅保留业务日志）
+# 重启容器
 compose_restart_all() {
   log "确保容器加载新 .env ..."
   cd "$PROJECT_DIR" || exit 1
@@ -573,7 +570,6 @@ compose_restart_all() {
     docker compose restart nginx >/dev/null 2>&1
   fi
   
-  # 兜底启动
   if [[ -z "$backend_status" ]]; then
     docker compose start backend >/dev/null 2>&1 || warn "backend容器未创建，跳过启动"
   fi
@@ -585,7 +581,7 @@ compose_restart_all() {
 }
 
 # -----------------------------
-# 主流程（仅保留业务日志）
+# 主流程
 # -----------------------------
 need_root
 
