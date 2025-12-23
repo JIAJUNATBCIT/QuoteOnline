@@ -449,7 +449,7 @@ wait_for_env_nonplaceholder() {
   log "等待 GitHub Actions 下发真实 .env ..."
   local env_path="$PROJECT_DIR/.env"
   local i=0
-  local interval=1  # 轮询间隔从2秒缩短到1秒
+  local interval=3  # 轮询间隔3秒
 
   while true; do
     i=$((i+1))
