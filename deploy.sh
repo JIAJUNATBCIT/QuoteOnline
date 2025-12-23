@@ -72,11 +72,11 @@ install_deps() {
 
   # 批量安装依赖（区分系统，解决Ubuntu/CentOS包名差异）
   if [[ "$mgr" == "apt" ]]; then
-    # Ubuntu 依赖包（包含lsof，避免后续端口检测缺失）
-    apt install -y -qq git curl jq ca-certificates gnupg lsb-release openssl certbot python3-certbot-nginx lsof >/dev/null 2>&1
+    # Ubuntu 依赖包
+    apt install -y -qq git curl jq ca-certificates gnupg lsb-release openssl certbot python3-certbot-nginx lsof net-tools >/dev/null 2>&1
   else
     # CentOS 依赖包
-    $mgr install -y -q git curl jq ca-certificates openssl certbot python3-certbot-nginx lsof >/dev/null 2>&1 || true
+    $mgr install -y -q git curl jq ca-certificates openssl certbot python3-certbot-nginx lsof net-tools >/dev/null 2>&1 || true
   fi
 
   # Docker安装（优化：使用国内镜像加速，可选）
@@ -153,32 +153,52 @@ install_deps() {
   ok "依赖安装完成"
 }
 
-# 释放端口（优化：系统兼容+容错增强，避免脚本退出）
+# 释放端口（优化：彻底释放80/443，兼容CentOS/Ubuntu）
 free_ports() {
   log "释放 80/443 端口占用..."
-  # 查找并停止占用80/443的进程（兼容lsof未安装/无进程的情况）
+
+  # 第一步：停止系统自带的Web服务（Nginx/Apache）
+  local services=("nginx" "apache2" "httpd")
+  for svc in "${services[@]}"; do
+    if command -v systemctl >/dev/null 2>&1; then
+      sudo systemctl stop "$svc" >/dev/null 2>&1 || true
+      sudo systemctl disable "$svc" >/dev/null 2>&1 || true
+    fi
+    # 兼容非systemd系统
+    sudo service "$svc" stop >/dev/null 2>&1 || true
+  done
+
+  # 第二步：查找并杀死占用80/443的进程（兼容lsof未安装）
   if command -v lsof >/dev/null 2>&1; then
     for port in 80 443; do
-      local pid
-      # 修复：强制忽略lsof执行错误，避免空值导致的问题
-      pid=$(lsof -t -i:"$port" -sTCP:LISTEN 2>/dev/null || true)
-      if [[ -n "$pid" ]]; then
-        # 强制忽略kill错误（如进程已结束）
-        kill -9 "$pid" >/dev/null 2>&1 || true
+      local pids
+      pids=$(lsof -t -i:"$port" -sTCP:LISTEN 2>/dev/null || true)
+      if [[ -n "$pids" ]]; then
+        sudo kill -9 $pids >/dev/null 2>&1 || true
       fi
     done
+  else
+    # 备用方案：用netstat查找进程（需安装net-tools）
+    if command -v netstat >/dev/null 2>&1; then
+      for port in 80 443; do
+        local pids
+        pids=$(netstat -tulpn | grep ":$port" | awk '{print $7}' | cut -d'/' -f1 | grep -E '^[0-9]+$' || true)
+        if [[ -n "$pids" ]]; then
+          sudo kill -9 $pids >/dev/null 2>&1 || true
+        fi
+      done
+    fi
   fi
 
-  # 停掉占用80/443的docker容器（兼容无容器的情况，区分xargs参数）
-  # 修复：Ubuntu老版本xargs不支持-r，改用--no-run-if-empty（同时兼容-r）
-  if command -v xargs >/dev/null 2>&1; then
-    # 检测xargs是否支持--no-run-if-empty
+  # 第三步：停掉占用80/443的docker容器
+  if command -v docker >/dev/null 2>&1; then
+    # 兼容xargs参数差异
     if xargs --help 2>&1 | grep -q -- --no-run-if-empty; then
-      docker ps -q --filter "publish=80"  | xargs --no-run-if-empty docker stop >/dev/null 2>&1 || true
-      docker ps -q --filter "publish=443" | xargs --no-run-if-empty docker stop >/dev/null 2>&1 || true
+      docker ps -q --filter "publish=80"  | xargs --no-run-if-empty sudo docker stop >/dev/null 2>&1 || true
+      docker ps -q --filter "publish=443" | xargs --no-run-if-empty sudo docker stop >/dev/null 2>&1 || true
     else
-      docker ps -q --filter "publish=80"  | xargs -r docker stop >/dev/null 2>&1 || true
-      docker ps -q --filter "publish=443" | xargs -r docker stop >/dev/null 2>&1 || true
+      docker ps -q --filter "publish=80"  | xargs -r sudo docker stop >/dev/null 2>&1 || true
+      docker ps -q --filter "publish=443" | xargs -r sudo docker stop >/dev/null 2>&1 || true
     fi
   fi
 
