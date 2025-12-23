@@ -360,11 +360,12 @@ dns_check() {
   ok "DNS 解析正常"
 }
 
-# 申请证书（优化：跳过重复申请）
+# 申请证书（优化：添加超时+错误输出+端口验证，解决卡住问题）
 obtain_cert_webroot_test() {
   local domain="$1"
   local domain_www="www.${domain}"
   local cert_path="/etc/letsencrypt/live/${domain}/fullchain.pem"
+  local webroot="/var/www/QuoteOnline/client/dist/quote-online-client"
 
   if [[ -f "$cert_path" ]]; then
     log "测试证书已存在，跳过申请"
@@ -372,13 +373,22 @@ obtain_cert_webroot_test() {
     return
   fi
 
+  # 前置检查：确保80端口对外可访问（HTTP-01验证必需）
+  log "检查 80 端口是否对外可访问..."
+  if ! curl -I --connect-timeout 10 http://"$domain"/.well-known/acme-challenge/test 2>/dev/null; then
+    warn "80端口可能被拦截，HTTP-01验证可能失败，请确保80端口对外开放"
+  fi
+
   log "申请 SSL 证书（webroot + --test-cert）..."
 
-  certbot certonly --webroot \
-    -w "$DIST_DIR" \
+  # 修复：添加超时控制+详细输出，避免卡住
+  if ! timeout 120 certbot certonly --webroot \
+    -w "$webroot" \
     -d "$domain" -d "$domain_www" \
-    --non-interactive --agree-tos --register-unsafely-without-email \
-    --test-cert >/dev/null 2>&1
+    --agree-tos --register-unsafely-without-email \
+    --test-cert --verbose 2>&1; then
+    die "证书申请失败，请检查：1.80端口是否对外开放 2.webroot目录是否存在 3.域名解析是否正确"
+  fi
 
   [[ -f "$cert_path" ]] || die "证书文件不存在，申请失败"
   ok "测试证书申请成功：/etc/letsencrypt/live/${domain}/"
