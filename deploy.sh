@@ -72,26 +72,41 @@ install_deps() {
 
   # 批量安装依赖（区分系统，解决Ubuntu/CentOS包名差异）
   if [[ "$mgr" == "apt" ]]; then
-    # Ubuntu 依赖包
+    # Ubuntu 依赖包（包含lsof/net-tools，避免后续端口检测缺失）
     apt install -y -qq git curl jq ca-certificates gnupg lsb-release openssl certbot python3-certbot-nginx lsof net-tools >/dev/null 2>&1
   else
     # CentOS 依赖包
     $mgr install -y -q git curl jq ca-certificates openssl certbot python3-certbot-nginx lsof net-tools >/dev/null 2>&1 || true
   fi
 
-  # Docker安装（优化：使用国内镜像加速，可选）
+  # Docker安装（优化：使用国内镜像加速）
   install_docker() {
     if command -v docker >/dev/null 2>&1; then
-      log "Docker 已安装，跳过"
+      log "Docker 已安装，配置镜像加速"
+      # 添加镜像加速配置
+      mkdir -p /etc/docker
+      cat > /etc/docker/daemon.json <<EOF
+{
+  "registry-mirrors": ["https://hub-mirror.c.163.com", "https://mirror.aliyuncs.com"]
+}
+EOF
+      systemctl daemon-reload && systemctl restart docker >/dev/null 2>&1 || true
       systemctl enable --now docker >/dev/null 2>&1 || true
       return
     fi
 
     log "安装 Docker（加速版）..."
-    # 国内镜像加速（注释掉可恢复默认）
-    # curl -fsSL https://get.docker.com | sh -s -- --mirror Aliyun
-    curl -fsSL https://get.docker.com | sh >/dev/null 2>&1
+    # 国内镜像加速安装 Docker
+    curl -fsSL https://get.docker.com | sh -s -- --mirror Aliyun >/dev/null 2>&1
     systemctl enable --now docker >/dev/null 2>&1 || true
+    # 配置镜像加速
+    mkdir -p /etc/docker
+    cat > /etc/docker/daemon.json <<EOF
+{
+  "registry-mirrors": ["https://hub-mirror.c.163.com", "https://mirror.aliyuncs.com"]
+}
+EOF
+    systemctl daemon-reload && systemctl restart docker >/dev/null 2>&1 || true
   }
 
   # Docker Compose安装（优化：使用更快的下载源）
@@ -103,9 +118,8 @@ install_deps() {
 
     log "安装 Docker Compose..."
     mkdir -p /usr/local/lib/docker/cli-plugins
-    # 国内镜像加速（注释掉可恢复默认）
-    # curl -SL "https://mirror.ghproxy.com/https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64" \
-    curl -SL "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64" \
+    # 国内镜像加速下载
+    curl -SL "https://mirror.ghproxy.com/https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64" \
       -o /usr/local/lib/docker/cli-plugins/docker-compose >/dev/null 2>&1
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
   }
@@ -178,7 +192,7 @@ free_ports() {
       fi
     done
   else
-    # 备用方案：用netstat查找进程（需安装net-tools）
+    # 备用方案：用netstat查找进程
     if command -v netstat >/dev/null 2>&1; then
       for port in 80 443; do
         local pids
@@ -303,7 +317,7 @@ build_frontend() {
   # 复制环境文件
   cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts" || true
 
-  # 构建优化：使用并行构建（仅Angular构建使用，避免Docker Compose的--parallel冲突）
+  # 构建优化：使用并行构建（仅Angular构建使用）
   if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)" >/dev/null 2>&1; then
     npm run -s build:optimized -- --no-interactive --parallel "$DOCKER_BUILD_PARALLEL"
   else
@@ -357,15 +371,22 @@ EOF
   ok "HTTP-only nginx.conf 已写入：$NGINX_CONF"
 }
 
-# 启动容器（修复：移除不支持的--parallel标志）
+# 启动容器（修复：清理异常网络 + 移除--parallel标志）
 compose_up_http() {
   log "启动容器（HTTP 模式先跑起来，供 webroot 验证）..."
   cd "$PROJECT_DIR" || exit 1
+  
+  # 修复：清理异常Docker网络
+  local network_name="quoteonline_quote-network"
+  if docker network inspect "$network_name" >/dev/null 2>&1; then
+    docker network disconnect -f "$network_name" $(docker ps -q --filter "network=$network_name") >/dev/null 2>&1 || true
+    docker network rm "$network_name" >/dev/null 2>&1 || true
+  fi
+
   # 仅在首次启动时构建，后续直接启动
   local build_flag="$PROJECT_DIR/.docker_build_done"
   if [[ ! -f "$build_flag" ]]; then
     docker compose down || true
-    # 修复：移除--parallel标志，兼容老版本Docker Compose
     docker compose up -d --build
     touch "$build_flag"
   else
@@ -393,7 +414,7 @@ dns_check() {
   ok "DNS 解析正常"
 }
 
-# 申请证书（优化：添加超时+错误输出+端口验证，解决卡住问题）
+# 申请证书（优化：添加超时+错误输出+端口验证）
 obtain_cert_webroot_test() {
   local domain="$1"
   local domain_www="www.${domain}"
@@ -406,7 +427,7 @@ obtain_cert_webroot_test() {
     return
   fi
 
-  # 前置检查：确保80端口对外可访问（HTTP-01验证必需）
+  # 前置检查：确保80端口对外可访问
   log "检查 80 端口是否对外可访问..."
   if ! curl -I --connect-timeout 10 http://"$domain"/.well-known/acme-challenge/test 2>/dev/null; then
     warn "80端口可能被拦截，HTTP-01验证可能失败，请确保80端口对外开放"
@@ -414,7 +435,7 @@ obtain_cert_webroot_test() {
 
   log "申请 SSL 证书（webroot + --test-cert）..."
 
-  # 修复：添加超时控制+详细输出，避免卡住
+  # 修复：添加超时控制+详细输出
   if ! timeout 120 certbot certonly --webroot \
     -w "$webroot" \
     -d "$domain" -d "$domain_www" \
@@ -446,14 +467,13 @@ restart_nginx_container() {
   ok "nginx 已重启"
 }
 
-# 配置证书自动续期（修复：兼容无现有cron任务的情况，避免脚本退出）
+# 配置证书自动续期（修复：兼容无现有cron任务）
 setup_renew_cron() {
   log "配置证书自动续期（cron：每天 03:00 renew + 重启 nginx）..."
   # 定义cron任务内容
   local cron_task="0 3 * * * certbot renew --quiet && cd $PROJECT_DIR && docker compose restart nginx >/dev/null 2>&1"
-  # 检查是否已存在该任务（兼容无现有cron的情况）
+  # 检查是否已存在该任务
   if ! crontab -l 2>/dev/null | grep -qF "$cron_task"; then
-    # 修复：使用 || true 保证crontab -l失败时不触发脚本退出
     (crontab -l 2>/dev/null || true; echo "$cron_task") | crontab -
   fi
   ok "自动续期已设置"
@@ -490,16 +510,15 @@ EOF
   die "Workflow 触发失败，已重试3次"
 }
 
-# 等待真实.env（优化：缩短轮询间隔+超时时间）
+# 等待真实.env（优化：缩短轮询间隔）
 wait_for_env_nonplaceholder() {
   log "等待 GitHub Actions 下发真实 .env ..."
   local env_path="$PROJECT_DIR/.env"
   local i=0
-  local interval=1  # 轮询间隔从2秒缩短到1秒
+  local interval=1
 
   while true; do
     i=$((i+1))
-    # 修复：拆分条件判断，避免空值导致的解析错误
     if [[ -s "$env_path" ]]; then
       if grep -q '^MONGODB_URI=' "$env_path" && ! grep -q '^MONGODB_URI=placeholder' "$env_path"; then
         chmod 600 "$env_path" || true
@@ -518,14 +537,13 @@ wait_for_env_nonplaceholder() {
 compose_restart_all() {
   log "确保容器加载新 .env ..."
   cd "$PROJECT_DIR" || exit 1
-  # 仅重启backend服务（nginx无需重启，除非配置变化）
   docker compose up -d >/dev/null 2>&1
   docker compose restart backend >/dev/null 2>&1
   ok "服务已重启并加载新配置"
 }
 
 # -----------------------------
-# 主流程（调整步骤顺序+优化执行逻辑）
+# 主流程
 # -----------------------------
 need_root
 
@@ -540,43 +558,24 @@ read -s -p "请输入 GitHub PAT（需要 repo 权限，建议也有 workflow �
 echo ""
 [[ -n "${GITHUB_PAT}" ]] || die "GitHub PAT 不能为空"
 
-# 核心步骤执行（按你的要求调整顺序）
+# 核心步骤执行
 PKG_MGR="$(detect_pkg_mgr)"
 install_deps "$PKG_MGR"
 free_ports
 clone_repo "$GITHUB_PAT"
 ensure_dirs
 
-# 1) 构建前端（避免nginx 403）
 build_frontend
-
-# 2) 生成HTTP-only Nginx配置
 write_nginx_http_only "$DOMAIN"
-
-# 3) 生成占位.env
 ensure_stub_env
-
-# 4) 触发Workflow并等待真实.env（挪到容器启动前）
 trigger_workflow "$GITHUB_PAT" "$DOMAIN"
 wait_for_env_nonplaceholder
-
-# 5) 启动容器（HTTP模式）
 compose_up_http
-
-# 6) DNS检查
 dns_check "$DOMAIN"
-
-# 7) 申请测试证书
 obtain_cert_webroot_test "$DOMAIN"
-
-# 8) 生成HTTPS配置并重启Nginx
 write_nginx_https_from_template "$DOMAIN"
 restart_nginx_container
-
-# 9) 配置证书自动续期
 setup_renew_cron
-
-# 10) 重启容器加载最新配置（可选，确保万无一失）
 compose_restart_all
 
 echo ""
