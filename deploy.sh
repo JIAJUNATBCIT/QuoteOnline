@@ -413,12 +413,15 @@ restart_nginx_container() {
   ok "nginx 已重启"
 }
 
-# 配置证书自动续期（优化：避免重复添加cron任务）
+# 配置证书自动续期（修复：兼容无现有cron任务的情况，避免脚本退出）
 setup_renew_cron() {
   log "配置证书自动续期（cron：每天 03:00 renew + 重启 nginx）..."
-  # 检查是否已存在该cron任务
-  if ! crontab -l 2>/dev/null | grep -q "certbot renew --quiet && cd $PROJECT_DIR && docker compose restart nginx"; then
-    (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet && cd $PROJECT_DIR && docker compose restart nginx >/dev/null 2>&1") | crontab -
+  # 定义cron任务内容
+  local cron_task="0 3 * * * certbot renew --quiet && cd $PROJECT_DIR && docker compose restart nginx >/dev/null 2>&1"
+  # 检查是否已存在该任务（兼容无现有cron的情况）
+  if ! crontab -l 2>/dev/null | grep -qF "$cron_task"; then
+    # 修复：使用 || true 保证crontab -l失败时不触发脚本退出
+    (crontab -l 2>/dev/null || true; echo "$cron_task") | crontab -
   fi
   ok "自动续期已设置"
 }
