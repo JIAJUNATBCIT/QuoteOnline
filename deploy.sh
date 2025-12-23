@@ -445,12 +445,12 @@ obtain_cert_webroot_test() {
     -w "$webroot" \
     -d "$domain" -d "$domain_www" \
     --agree-tos --register-unsafely-without-email \
-    --test-cert --verbose 2>&1; then
+    --verbose 2>&1; then
     die "证书申请失败，请检查：1.80端口是否对外开放 2.webroot目录是否存在 3.域名解析是否正确"
   fi
 
   [[ -f "$cert_path" ]] || die "证书文件不存在，申请失败"
-  ok "测试证书申请成功：/etc/letsencrypt/live/${domain}/"
+  ok "证书申请成功：/etc/letsencrypt/live/${domain}/"
 }
 
 # 生成HTTPS Nginx配置
