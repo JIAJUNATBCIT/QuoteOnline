@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 纯文本banner（无echo -e和颜色）
-echo "=========================================="
-echo "  QuoteOnline One-Click Deploy (Stable)"
-echo "  Bridge network + webroot TLS + GH env"
-echo "  (keeps --test-cert)"
-echo "=========================================="
-echo ""
+# -----------------------------
+# 颜色常量（printf实现，无echo）
+# -----------------------------
+COLOR_BLUE="\033[34m"
+COLOR_GREEN="\033[32m"
+COLOR_YELLOW="\033[33m"
+COLOR_RED="\033[31m"
+COLOR_RESET="\033[0m"
 
 # -----------------------------
 # 配置常量（可根据项目调整）
@@ -24,12 +25,12 @@ WAIT_ENV_TIMEOUT=120  # .env等待超时（秒）
 DOCKER_BUILD_PARALLEL=2  # 前端构建并行数
 
 # -----------------------------
-# 工具函数（纯文本输出，无echo -e）
+# 工具函数（printf实现颜色输出，无echo）
 # -----------------------------
-log()  { echo "▶ $*"; }
-ok()   { echo "✅ $*"; }
-warn() { echo "⚠️ $*" >&2; }
-die()  { echo "❌ $*" >&2; exit 1; }
+log()  { printf "${COLOR_BLUE}▶ %s${COLOR_RESET}\n" "$*"; }
+ok()   { printf "${COLOR_GREEN}✅ %s${COLOR_RESET}\n" "$*"; }
+warn() { printf "${COLOR_YELLOW}⚠️ %s${COLOR_RESET}\n" "$*" >&2; }
+die()  { printf "${COLOR_RED}❌ %s${COLOR_RESET}\n" "$*" >&2; exit 1; }
 
 # 检查root权限
 need_root() {
@@ -43,7 +44,7 @@ detect_pkg_mgr() {
   local mgr
   for mgr in apt dnf yum; do
     if command -v "$mgr" >/dev/null 2>&1; then
-      echo "$mgr"
+      printf "%s" "$mgr"
       return
     fi
   done
@@ -202,15 +203,26 @@ clone_repo() {
     cd "$PROJECT_DIR" && git fetch origin --depth 1 >/dev/null 2>&1 && git reset --hard origin/main >/dev/null 2>&1
   fi
 
+  # 检查项目核心目录是否存在
+  if [[ ! -d "$PROJECT_DIR/backend" ]]; then
+    warn "未找到 backend 目录，自动创建空目录"
+    mkdir -p "$PROJECT_DIR/backend" || true
+  fi
+  if [[ ! -d "$PROJECT_DIR/nginx" ]]; then
+    warn "未找到 nginx 目录，自动创建空目录"
+    mkdir -p "$PROJECT_DIR/nginx" || true
+  fi
+
   ok "代码同步完成"
 }
 
-# 生成.dockerignore（优化构建上下文）
+# 生成.dockerignore（优化构建上下文，增加容错）
 generate_dockerignore() {
   log "生成.dockerignore，优化构建上下文..."
 
-  # Backend .dockerignore
-  cat > "$PROJECT_DIR/backend/.dockerignore" <<EOF
+  # Backend .dockerignore（先检查目录是否存在）
+  if [[ -d "$PROJECT_DIR/backend" ]]; then
+    cat > "$PROJECT_DIR/backend/.dockerignore" <<EOF
 node_modules/
 dist/
 logs/
@@ -220,15 +232,22 @@ uploads/
 .env
 *.log
 EOF
+  else
+    warn "backend 目录不存在，跳过生成 .dockerignore"
+  fi
 
-  # Nginx .dockerignore（若存在）
-  [[ -d "$PROJECT_DIR/nginx" ]] && cat > "$PROJECT_DIR/nginx/.dockerignore" <<EOF
+  # Nginx .dockerignore（先检查目录是否存在）
+  if [[ -d "$PROJECT_DIR/nginx" ]]; then
+    cat > "$PROJECT_DIR/nginx/.dockerignore" <<EOF
 .git/
 .gitignore
 *.log
 EOF
+  else
+    warn "nginx 目录不存在，跳过生成 .dockerignore"
+  fi
 
-  ok ".dockerignore 生成完成"
+  ok ".dockerignore 生成完成（不存在的目录已跳过）"
 }
 
 # 创建项目目录
@@ -276,7 +295,11 @@ EOF
 # 构建前端代码
 build_frontend() {
   log "构建 Angular 前端..."
-  cd "$CLIENT_DIR" || die "未找到前端目录：$CLIENT_DIR"
+  # 检查前端目录是否存在
+  if [[ ! -d "$CLIENT_DIR" ]]; then
+    die "未找到前端目录：$CLIENT_DIR（请确认项目代码包含 client 目录）"
+  fi
+  cd "$CLIENT_DIR" || exit 1
 
   # 环境变量配置
   export CI=1
@@ -294,8 +317,13 @@ build_frontend() {
     cp -r "$node_cache" node_modules || true
   fi
 
+  # 检查package.json是否存在
+  if [[ ! -f "$CLIENT_DIR/package.json" ]]; then
+    die "未找到 package.json：$CLIENT_DIR/package.json（前端代码不完整）"
+  fi
+
   # 构建前端
-  cp -f "$CLIENT_DIR/src/environments/environment.prod.ts" "$CLIENT_DIR/environment.ts" || true
+  cp -f "$CLIENT_DIR/src/environments/environment.prod.ts" "$CLIENT_DIR/environment.ts" 2>/dev/null || true
   if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)" >/dev/null 2>&1; then
     npm run -s build:optimized -- --no-interactive --parallel "$DOCKER_BUILD_PARALLEL"
   else
@@ -351,6 +379,11 @@ EOF
 compose_up_http() {
   log "启动容器（HTTP模式）..."
   cd "$PROJECT_DIR" || exit 1
+
+  # 检查docker-compose.yml是否存在
+  if [[ ! -f "$PROJECT_DIR/docker-compose.yml" ]]; then
+    die "未找到 docker-compose.yml：$PROJECT_DIR/docker-compose.yml（项目配置不完整）"
+  fi
 
   # 1. 删除同名镜像（避免冲突）
   local images=("quoteonline-backend:latest" "quoteonline-nginx:latest")
@@ -433,7 +466,11 @@ write_nginx_https_from_template() {
   local domain="$1"
   log "生成 HTTPS Nginx 配置..."
 
-  [[ -f "$NGINX_TEMPLATE" ]] || die "未找到Nginx模板：$NGINX_TEMPLATE"
+  if [[ ! -f "$NGINX_TEMPLATE" ]]; then
+    warn "未找到Nginx模板：$NGINX_TEMPLATE，跳过HTTPS配置生成"
+    ok "HTTPS配置生成跳过（模板不存在）"
+    return
+  fi
   sed "s/{{DOMAIN}}/${domain}/g" "$NGINX_TEMPLATE" > "$NGINX_CONF"
   ok "HTTPS配置已生成：$NGINX_CONF"
 }
@@ -442,8 +479,14 @@ write_nginx_https_from_template() {
 restart_nginx_container() {
   log "重启 Nginx 容器..."
   cd "$PROJECT_DIR" || exit 1
-  docker compose restart nginx >/dev/null 2>&1 || true
-  ok "Nginx 已重启"
+  # 检查Nginx容器是否存在
+  if docker compose ps -q nginx >/dev/null 2>&1; then
+    docker compose restart nginx >/dev/null 2>&1 || true
+    ok "Nginx 已重启"
+  else
+    warn "Nginx容器不存在，跳过重启"
+    ok "Nginx重启跳过（容器不存在）"
+  fi
 }
 
 # 配置证书自动续期
@@ -452,7 +495,7 @@ setup_renew_cron() {
   local cron_task="0 3 * * * certbot renew --quiet && cd $PROJECT_DIR && docker compose restart nginx >/dev/null 2>&1"
   
   if ! crontab -l 2>/dev/null | grep -qF "$cron_task"; then
-    (crontab -l 2>/dev/null || true; echo "$cron_task") | crontab -
+    (crontab -l 2>/dev/null || true; printf "%s\n" "$cron_task") | crontab -
   fi
 
   ok "证书自动续期已配置"
@@ -514,8 +557,8 @@ wait_for_env_nonplaceholder() {
       die ".env等待超时（${timeout}秒）：检查GitHub Actions是否执行成功"
     fi
 
-    # 动态更新计时
-    printf "\r⏳ 等待中... 已耗时 ${i}秒 / 超时 ${timeout}秒"
+    # 动态更新计时（保留颜色）
+    printf "\r${COLOR_BLUE}⏳ 等待中... 已耗时 ${i}秒 / 超时 ${timeout}秒${COLOR_RESET}"
     sleep $interval
   done
 
@@ -530,14 +573,29 @@ compose_restart_all() {
   local backend=$(docker compose ps -q backend)
   local nginx=$(docker compose ps -q nginx)
 
-  [[ -n "$backend" ]] && docker compose restart backend >/dev/null 2>&1 || true
-  [[ -n "$nginx" ]] && docker compose restart nginx >/dev/null 2>&1 || true
+  if [[ -n "$backend" ]]; then
+    docker compose restart backend >/dev/null 2>&1
+    log "backend容器已重启"
+  else
+    warn "backend容器不存在，跳过重启"
+  fi
+
+  if [[ -n "$nginx" ]]; then
+    docker compose restart nginx >/dev/null 2>&1
+    log "nginx容器已重启"
+  else
+    warn "nginx容器不存在，跳过重启"
+  fi
 
   # 兜底启动（若容器未运行）
-  [[ -z "$backend" ]] && docker compose start backend >/dev/null 2>&1 || true
-  [[ -z "$nginx" ]] && docker compose start nginx >/dev/null 2>&1 || true
+  if [[ -z "$backend" ]]; then
+    docker compose start backend >/dev/null 2>&1 || warn "backend容器未找到，无法启动"
+  fi
+  if [[ -z "$nginx" ]]; then
+    docker compose start nginx >/dev/null 2>&1 || warn "nginx容器未找到，无法启动"
+  fi
 
-  ok "容器已重启并加载新配置"
+  ok "容器重启流程完成（不存在的容器已跳过）"
 }
 
 # -----------------------------
@@ -545,14 +603,16 @@ compose_restart_all() {
 # -----------------------------
 need_root
 
-# 读取部署参数
+# 读取部署参数（printf实现交互提示）
 log "读取部署参数"
-read -p "请输入域名（如：portal.example.com）: " DOMAIN
+printf "${COLOR_BLUE}请输入域名（如：portal.example.com）: ${COLOR_RESET}"
+read -r DOMAIN
 [[ -n "${DOMAIN}" ]] || die "域名不能为空"
 [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || die "域名格式不合法"
 
-read -s -p "请输入 GitHub PAT（含repo/workflow权限）: " GITHUB_PAT
-echo ""
+printf "${COLOR_BLUE}请输入 GitHub PAT（含repo/workflow权限）: ${COLOR_RESET}"
+read -s GITHUB_PAT
+printf "\n"
 [[ -n "${GITHUB_PAT}" ]] || die "GitHub PAT 不能为空"
 
 # 核心部署步骤
@@ -575,15 +635,15 @@ restart_nginx_container
 setup_renew_cron
 compose_restart_all
 
-# 部署完成提示
-echo ""
-echo "=========================================="
+# 部署完成提示（printf+颜色）
+printf "\n"
+printf "${COLOR_GREEN}==========================================${COLOR_RESET}\n"
 ok "部署完成！"
-echo "访问地址：https://${DOMAIN}"
-echo "项目目录：$PROJECT_DIR"
-echo "容器状态：docker compose -f $PROJECT_DIR/docker-compose.yml ps"
-echo "日志查看：docker compose -f $PROJECT_DIR/docker-compose.yml logs"
-echo "=========================================="
+printf "${COLOR_BLUE}访问地址：https://%s${COLOR_RESET}\n" "$DOMAIN"
+printf "${COLOR_BLUE}项目目录：%s${COLOR_RESET}\n" "$PROJECT_DIR"
+printf "${COLOR_BLUE}容器状态：docker compose -f %s/docker-compose.yml ps${COLOR_RESET}\n" "$PROJECT_DIR"
+printf "${COLOR_BLUE}日志查看：docker compose -f %s/docker-compose.yml logs${COLOR_RESET}\n" "$PROJECT_DIR"
+printf "${COLOR_GREEN}==========================================${COLOR_RESET}\n"
 
 # 清理临时文件
 rm -f /tmp/.pkg_update_done
