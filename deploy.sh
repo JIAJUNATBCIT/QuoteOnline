@@ -129,22 +129,10 @@ EOF
     ln -s "$NVM_DIR/versions/node/v20*/bin/npm" /usr/local/bin/npm || true
   }
 
-  # 安装Angular CLI（国内镜像）
-  install_angular_cli() {
-    if command -v ng >/dev/null 2>&1; then
-      log "Angular CLI 已安装，跳过"
-      return
-    fi
-    log "安装 Angular CLI..."
-    npm config set registry https://registry.npmmirror.com
-    npm install -g @angular/cli --force >/dev/null 2>&1
-  }
-
-  # 执行安装
+  # 执行安装（移除全局Angular CLI安装，改为项目内安装）
   install_docker
   install_docker_compose
   install_node
-  install_angular_cli
 
   ok "依赖安装完成"
 }
@@ -297,7 +285,17 @@ EOF
   ok "占位 .env 已创建：$env_path"
 }
 
-# 构建前端代码（核心修复：适配无锁文件+加速安装）
+# 读取项目Angular版本（核心修复）
+get_angular_version() {
+  cd "$CLIENT_DIR" || exit 1
+  # 从package.json读取@angular/core版本
+  local ng_version=$(node -e "console.log(require('./package.json').dependencies['@angular/core'] || require('./package.json').devDependencies['@angular/core'] || 'latest')")
+  # 提取主版本（如21.0.6 -> 21）
+  local ng_major_version=$(echo "$ng_version" | grep -oE '^[0-9]+' || echo "latest")
+  printf "%s" "$ng_major_version"
+}
+
+# 构建前端代码（核心修复：版本兼容）
 build_frontend() {
   log "构建 Angular 前端..."
   # 检查前端目录是否存在
@@ -322,27 +320,35 @@ build_frontend() {
     die "未找到 package.json：$CLIENT_DIR/package.json（前端代码不完整）"
   fi
 
+  # 读取项目Angular主版本
+  local ng_major_version=$(get_angular_version)
+  log "检测到项目Angular主版本：v${ng_major_version}"
+
   # 清理旧依赖（避免冲突）
   rm -rf node_modules 2>/dev/null || true
 
   # 缓存node_modules（简化逻辑：优先复用，无则安装）
-  local node_cache="$HOME/.npm-cache/quoteonline-node_modules"
+  local node_cache="$HOME/.npm-cache/quoteonline-node_modules_v${ng_major_version}"
   mkdir -p "$node_cache" || true
 
   if [[ -d "$node_cache/node_modules" ]]; then
-    log "复用缓存的前端依赖..."
+    log "复用缓存的前端依赖（v${ng_major_version}）..."
     cp -r "$node_cache/node_modules" ./ || true
-    # 仅更新核心构建依赖
-    log "更新Angular核心构建依赖..."
-    timeout $NPM_INSTALL_TIMEOUT npm install @angular-devkit/build-angular @angular/cli --save-dev --force 2>/dev/null || {
-      warn "核心依赖更新失败，继续使用缓存版本"
+    # 确保CLI版本匹配
+    log "检查并更新匹配版本的Angular CLI..."
+    timeout $NPM_INSTALL_TIMEOUT npm install @angular/cli@${ng_major_version} --save-dev --force 2>/dev/null || {
+      warn "CLI更新失败，尝试使用已安装版本"
     }
   else
     # 无缓存，直接安装（优先核心依赖，再装全部）
-    log "首次部署，安装Angular核心依赖（国内镜像）..."
-    # 先装核心依赖，减少整体安装时间
-    if ! timeout $NPM_INSTALL_TIMEOUT npm install @angular/core @angular-devkit/build-angular @angular/cli --save-dev --force; then
-      die "核心依赖安装失败（超时${NPM_INSTALL_TIMEOUT}秒），请检查网络或服务器配置"
+    log "首次部署，安装Angular核心依赖（v${ng_major_version}，国内镜像）..."
+    # 先装匹配版本的核心依赖和CLI
+    if ! timeout $NPM_INSTALL_TIMEOUT npm install @angular/core@${ng_major_version} @angular-devkit/build-angular@${ng_major_version} @angular/cli@${ng_major_version} --save-dev --force; then
+      # 若指定版本失败，尝试安装兼容版本
+      warn "指定版本安装失败，尝试安装最新兼容版本..."
+      if ! timeout $NPM_INSTALL_TIMEOUT npm install @angular/core @angular-devkit/build-angular @angular/cli --save-dev --force; then
+        die "核心依赖安装失败（超时${NPM_INSTALL_TIMEOUT}秒），请检查网络或服务器配置"
+      fi
     fi
 
     log "安装剩余前端依赖..."
@@ -356,7 +362,7 @@ build_frontend() {
 
   # 检查核心构建依赖是否存在
   if [[ ! -d "node_modules/@angular-devkit/build-angular" ]]; then
-    die "缺失Angular核心构建依赖：@angular-devkit/build-angular（安装失败，请手动执行：cd $CLIENT_DIR && npm install @angular-devkit/build-angular）"
+    die "缺失Angular核心构建依赖：@angular-devkit/build-angular（安装失败，请手动执行：cd $CLIENT_DIR && npm install @angular-devkit/build-angular@${ng_major_version}）"
   fi
 
   # 复制环境文件（容错）
@@ -366,12 +372,14 @@ build_frontend() {
     warn "未找到 environment.prod.ts，跳过环境文件复制"
   fi
 
-  # 构建前端（降低并行数，减少资源占用）
-  log "开始构建前端代码（低资源模式）..."
+  # 构建前端（使用项目本地CLI，避免全局版本冲突）
+  log "开始构建前端代码（低资源模式，本地CLI）..."
+  # 优先使用npm script，否则直接调用本地ng
   if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)" >/dev/null 2>&1; then
     npm run -s build:optimized -- --no-interactive --parallel "$DOCKER_BUILD_PARALLEL" --force --progress=false
   else
-    ng build --configuration production --no-interactive --parallel "$DOCKER_BUILD_PARALLEL" --force --progress=false
+    # 使用本地CLI执行构建
+    npx ng build --configuration production --no-interactive --parallel "$DOCKER_BUILD_PARALLEL" --force --progress=false
   fi
 
   # 检查构建结果
