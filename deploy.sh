@@ -510,27 +510,49 @@ EOF
   die "Workflow 触发失败，已重试3次"
 }
 
-# 等待真实.env（优化：缩短轮询间隔）
+# 等待真实.env（优化：单行动态计时输出，避免刷屏）
 wait_for_env_nonplaceholder() {
-  log "等待 GitHub Actions 下发真实 .env ..."
   local env_path="$PROJECT_DIR/.env"
   local i=0
   local interval=1
+  local timeout=$WAIT_ENV_TIMEOUT
 
+  # 打印初始提示（仅一次）
+  log "等待 GitHub Actions 下发真实 .env ... (超时时间: ${timeout}秒)"
+  
+  # 关闭命令执行的详细输出（避免循环内的命令日志刷屏）
+  set +x
+  
   while true; do
     i=$((i+1))
+    # 检查.env文件是否有效（非空 + MONGODB_URI已替换）
     if [[ -s "$env_path" ]]; then
       if grep -q '^MONGODB_URI=' "$env_path" && ! grep -q '^MONGODB_URI=placeholder' "$env_path"; then
         chmod 600 "$env_path" || true
-        ok "真实 .env 已就绪：$env_path"
+        # 清空当前行，打印成功提示
+        printf "\r\033[K"  # 清空当前行
+        ok "真实 .env 已就绪：$env_path (耗时 ${i}秒)"
+        # 恢复命令详细输出（如果需要）
+        set -x
         return
       fi
     fi
-    if [[ $i -gt $WAIT_ENV_TIMEOUT ]]; then
+
+    # 检查超时
+    if [[ $i -gt $timeout ]]; then
+      printf "\r\033[K"  # 清空当前行
+      # 恢复命令详细输出并退出
+      set -x
       die "等待超时：workflow 可能未成功 scp .env 到服务器（请去 GitHub Actions 看日志）"
     fi
-    sleep "$interval"
+
+    # 单行动态更新计时（覆盖当前行）
+    printf "\r⏳ 等待中... 已耗时 ${i}秒 / 超时 ${timeout}秒"
+    sleep $interval
   done
+
+  # 恢复命令详细输出（兜底）
+  set -x
 }
 
 # 重启容器（优化：仅重启变化的服务）
