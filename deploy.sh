@@ -24,7 +24,7 @@ NGINX_TEMPLATE="$CLIENT_DIR/nginx.conf.template"
 NGINX_CONF="$CLIENT_DIR/nginx.conf"
 # 超时配置
 WAIT_ENV_TIMEOUT=120  # 等待.env的超时时间（秒），从300秒缩短到120秒
-DOCKER_BUILD_PARALLEL=2  # Docker构建并行数
+DOCKER_BUILD_PARALLEL=2  # Docker构建并行数（根据CPU核心数调整）
 
 # -----------------------------
 # 工具函数（优化日志+错误处理）
@@ -110,20 +110,29 @@ install_deps() {
 
   # Node.js安装（优化：使用nvm快速安装，避免系统包管理器的版本问题）
   install_node() {
-    if command -v node >/dev/null 2>&1 && node -v | grep -q "v20"; then
-      log "Node.js 20 已安装，跳过"
-      return
+    # 先检查是否已安装Node.js 20
+    if command -v node >/dev/null 2>&1; then
+      local node_version
+      node_version=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+      if [[ "$node_version" == "20" ]]; then
+        log "Node.js 20 已安装，跳过"
+        return
+      fi
     fi
 
     log "安装 Node.js 20（nvm 加速版）..."
     # 安装nvm
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash >/dev/null 2>&1
-    # 加载nvm
+    # 加载nvm（兼容不同Shell）
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
     # 安装Node.js 20
     nvm install 20 >/dev/null 2>&1
     nvm alias default 20 >/dev/null 2>&1
+    # 确保全局可用
+    ln -s "$NVM_DIR/versions/node/v20*/bin/node" /usr/local/bin/node || true
+    ln -s "$NVM_DIR/versions/node/v20*/bin/npm" /usr/local/bin/npm || true
   }
 
   # 执行安装
@@ -145,13 +154,16 @@ install_deps() {
 # 释放端口（优化：仅检查并停止占用端口的进程，不盲目停止服务）
 free_ports() {
   log "释放 80/443 端口占用..."
-  # 查找并停止占用80/443的进程
-  for port in 80 443; do
-    local pid=$(lsof -t -i:"$port" -sTCP:LISTEN)
-    if [[ -n "$pid" ]]; then
-      kill -9 "$pid" >/dev/null 2>&1 || true
-    fi
-  done
+  # 查找并停止占用80/443的进程（兼容lsof未安装的情况）
+  if command -v lsof >/dev/null 2>&1; then
+    for port in 80 443; do
+      local pid
+      pid=$(lsof -t -i:"$port" -sTCP:LISTEN)
+      if [[ -n "$pid" ]]; then
+        kill -9 "$pid" >/dev/null 2>&1 || true
+      fi
+    done
+  fi
 
   # 停掉占用80/443的docker容器
   docker ps -q --filter "publish=80"  | xargs -r docker stop >/dev/null 2>&1 || true
@@ -166,7 +178,7 @@ clone_repo() {
   log "同步项目代码到 $PROJECT_DIR ..."
 
   mkdir -p /var/www
-  cd /var/www
+  cd /var/www || exit 1
 
   local repo_url="https://${pat}@github.com/${REPO_OWNER}/${REPO_NAME}.git"
 
@@ -175,7 +187,7 @@ clone_repo() {
     # 浅克隆：仅拉取最新1次提交，加速克隆
     git clone --depth 1 "$repo_url" "$PROJECT_DIR" >/dev/null 2>&1
   else
-    cd "$PROJECT_DIR"
+    cd "$PROJECT_DIR" || exit 1
     git fetch origin --depth 1 >/dev/null 2>&1
     git reset --hard origin/main >/dev/null 2>&1
   fi
@@ -196,7 +208,8 @@ ensure_dirs() {
 # 创建占位.env（优化：减少重复写入）
 ensure_stub_env() {
   local env_path="$PROJECT_DIR/.env"
-  if [[ -f "$env_path" && grep -q "MONGODB_URI=placeholder" "$env_path" ]]; then
+  # 修复：条件判断添加引号，避免空值解析错误
+  if [[ -f "$env_path" && $(grep -c "MONGODB_URI=placeholder" "$env_path") -gt 0 ]]; then
     log "占位 .env 已存在，跳过"
     return
   fi
@@ -229,7 +242,7 @@ EOF
 # 构建前端（优化：缓存node_modules，加速构建）
 build_frontend() {
   log "构建 Angular 前端（保证 dist 不为空）..."
-  cd "$CLIENT_DIR"
+  cd "$CLIENT_DIR" || exit 1
 
   [[ -f package.json ]] || die "未找到 $CLIENT_DIR/package.json，无法构建前端"
 
@@ -245,17 +258,17 @@ build_frontend() {
     npm ci --registry=https://registry.npmmirror.com --no-audit --no-fund >/dev/null 2>&1 || \
     npm install --registry=https://registry.npmmirror.com --no-audit --no-fund >/dev/null 2>&1
     # 缓存依赖
-    cp -r node_modules "$node_modules_cache"
+    cp -r node_modules "$node_modules_cache" || true
   else
     # 使用缓存
-    cp -r "$node_modules_cache" node_modules
+    cp -r "$node_modules_cache" node_modules || true
   fi
 
   # 复制环境文件
-  cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts"
+  cp -f "$PROJECT_DIR/client/src/environments/environment.prod.ts" "$PROJECT_DIR/client/environment.ts" || true
 
   # 构建优化：使用并行构建
-  if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)"; then
+  if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)" >/dev/null 2>&1; then
     npm run -s build:optimized -- --no-interactive --parallel "$DOCKER_BUILD_PARALLEL"
   else
     ng build --configuration production --no-interactive --parallel "$DOCKER_BUILD_PARALLEL"
@@ -311,12 +324,13 @@ EOF
 # 启动容器（优化：使用--no-cache避免缓存问题，仅在首次构建时构建）
 compose_up_http() {
   log "启动容器（HTTP 模式先跑起来，供 webroot 验证）..."
-  cd "$PROJECT_DIR"
+  cd "$PROJECT_DIR" || exit 1
   # 仅在首次启动时构建，后续直接启动
-  if [[ ! -f "$PROJECT_DIR/.docker_build_done" ]]; then
+  local build_flag="$PROJECT_DIR/.docker_build_done"
+  if [[ ! -f "$build_flag" ]]; then
     docker compose down || true
     docker compose up -d --build --parallel "$DOCKER_BUILD_PARALLEL"
-    touch "$PROJECT_DIR/.docker_build_done"
+    touch "$build_flag"
   else
     docker compose down || true
     docker compose up -d
@@ -328,9 +342,16 @@ compose_up_http() {
 dns_check() {
   local domain="$1"
   log "检查 DNS 解析（避免 NXDOMAIN）..."
-  # 使用8.8.8.8和114.114.114.114双DNS验证
-  if ! dig +short "@8.8.8.8" "$domain" && ! dig +short "@114.114.114.114" "$domain"; then
-    die "DNS 未解析：$domain（请先把 A 记录指到本机公网/Reserved IP，等待生效后再跑）"
+  # 兼容dig未安装的情况
+  if ! command -v dig >/dev/null 2>&1; then
+    if ! getent ahosts "$domain" >/dev/null 2>&1; then
+      die "DNS 未解析：$domain（请先把 A 记录指到本机公网/Reserved IP，等待生效后再跑）"
+    fi
+  else
+    # 使用8.8.8.8和114.114.114.114双DNS验证
+    if ! dig +short "@8.8.8.8" "$domain" && ! dig +short "@114.114.114.114" "$domain"; then
+      die "DNS 未解析：$domain（请先把 A 记录指到本机公网/Reserved IP，等待生效后再跑）"
+    fi
   fi
   ok "DNS 解析正常"
 }
@@ -373,7 +394,7 @@ write_nginx_https_from_template() {
 # 重启Nginx容器（无变化）
 restart_nginx_container() {
   log "重启 nginx 容器..."
-  cd "$PROJECT_DIR"
+  cd "$PROJECT_DIR" || exit 1
   docker compose restart nginx >/dev/null 2>&1
   ok "nginx 已重启"
 }
@@ -424,14 +445,17 @@ wait_for_env_nonplaceholder() {
   log "等待 GitHub Actions 下发真实 .env ..."
   local env_path="$PROJECT_DIR/.env"
   local i=0
-  local interval=2
+  local interval=1  # 轮询间隔从2秒缩短到1秒
 
   while true; do
     i=$((i+1))
-    if [[ -s "$env_path" ]] && grep -q '^MONGODB_URI=' "$env_path" && ! grep -q '^MONGODB_URI=placeholder' "$env_path"; then
-      chmod 600 "$env_path" || true
-      ok "真实 .env 已就绪：$env_path"
-      return
+    # 修复：拆分条件判断，避免空值导致的解析错误
+    if [[ -s "$env_path" ]]; then
+      if grep -q '^MONGODB_URI=' "$env_path" && ! grep -q '^MONGODB_URI=placeholder' "$env_path"; then
+        chmod 600 "$env_path" || true
+        ok "真实 .env 已就绪：$env_path"
+        return
+      fi
     fi
     if [[ $i -gt $WAIT_ENV_TIMEOUT ]]; then
       die "等待超时：workflow 可能未成功 scp .env 到服务器（请去 GitHub Actions 看日志）"
@@ -443,7 +467,7 @@ wait_for_env_nonplaceholder() {
 # 重启容器（优化：仅重启变化的服务）
 compose_restart_all() {
   log "确保容器加载新 .env ..."
-  cd "$PROJECT_DIR"
+  cd "$PROJECT_DIR" || exit 1
   # 仅重启backend服务（nginx无需重启，除非配置变化）
   docker compose up -d >/dev/null 2>&1
   docker compose restart backend >/dev/null 2>&1
