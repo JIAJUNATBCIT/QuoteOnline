@@ -2,9 +2,6 @@
 # 仅保留安全选项，彻底移除调试模式（-x）
 set -euo pipefail
 
-# 强制关闭所有调试输出（兜底）
-set +x >/dev/null 2>&1 || true
-
 # 启用终端颜色支持
 export TERM=xterm-256color
 
