@@ -371,12 +371,12 @@ EOF
   ok "HTTP-only nginx.conf 已写入：$NGINX_CONF"
 }
 
-# 启动容器（修复：清理异常网络 + 移除--parallel标志）
+# 启动容器（仅首次创建，无修改）
 compose_up_http() {
   log "启动容器（HTTP 模式先跑起来，供 webroot 验证）..."
   cd "$PROJECT_DIR" || exit 1
   
-  # 修复：清理异常Docker网络
+  # 清理异常Docker网络
   local network_name="quoteonline_quote-network"
   if docker network inspect "$network_name" >/dev/null 2>&1; then
     docker network disconnect -f "$network_name" $(docker ps -q --filter "network=$network_name") >/dev/null 2>&1 || true
@@ -387,7 +387,7 @@ compose_up_http() {
   local build_flag="$PROJECT_DIR/.docker_build_done"
   if [[ ! -f "$build_flag" ]]; then
     docker compose down || true
-    docker compose up -d --build
+    docker compose up -d --build  # 第一次创建容器（仅执行一次）
     touch "$build_flag"
   else
     docker compose down || true
@@ -555,12 +555,30 @@ wait_for_env_nonplaceholder() {
   set -x
 }
 
-# 重启容器（优化：仅重启变化的服务）
+# 重启容器（修复核心：仅重启，不重建）
 compose_restart_all() {
   log "确保容器加载新 .env ..."
   cd "$PROJECT_DIR" || exit 1
-  docker compose up -d >/dev/null 2>&1
-  docker compose restart backend >/dev/null 2>&1
+  
+  # 检查容器是否存在，仅重启/启动，不创建
+  local backend_status=$(docker compose ps -q backend)
+  local nginx_status=$(docker compose ps -q nginx)
+  
+  if [[ -n "$backend_status" ]]; then
+    docker compose restart backend >/dev/null 2>&1
+  fi
+  if [[ -n "$nginx_status" ]]; then
+    docker compose restart nginx >/dev/null 2>&1
+  fi
+  
+  # 兜底：若容器未运行，启动（不重建）
+  if [[ -z "$backend_status" ]]; then
+    docker compose start backend >/dev/null 2>&1 || warn "backend容器未创建，跳过启动"
+  fi
+  if [[ -z "$nginx_status" ]]; then
+    docker compose start nginx >/dev/null 2>&1 || warn "nginx容器未创建，跳过启动"
+  fi
+  
   ok "服务已重启并加载新配置"
 }
 
