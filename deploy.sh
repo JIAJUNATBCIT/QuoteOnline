@@ -212,6 +212,9 @@ clone_repo() {
     warn "未找到 nginx 目录，自动创建空目录"
     mkdir -p "$PROJECT_DIR/nginx" || true
   fi
+  if [[ ! -d "$PROJECT_DIR/client" ]]; then
+    die "未找到 client 目录：$PROJECT_DIR/client（前端代码缺失，无法继续部署）"
+  fi
 
   ok "代码同步完成"
 }
@@ -292,7 +295,7 @@ EOF
   ok "占位 .env 已创建：$env_path"
 }
 
-# 构建前端代码
+# 构建前端代码（修复核心：确保依赖正确安装）
 build_frontend() {
   log "构建 Angular 前端..."
   # 检查前端目录是否存在
@@ -305,32 +308,69 @@ build_frontend() {
   export CI=1
   export NG_CLI_ANALYTICS=false
   export npm_config_legacy_peer_deps=true
-
-  # 缓存node_modules
-  local node_cache="$HOME/.npm-cache/quoteonline-node_modules"
-  mkdir -p "$node_cache" || true
-  if [[ ! -d "$node_cache" ]]; then
-    npm ci --registry=https://registry.npmmirror.com --no-audit --no-fund >/dev/null 2>&1 || \
-    npm install --registry=https://registry.npmmirror.com --no-audit --no-fund >/dev/null 2>&1
-    cp -r node_modules "$node_cache" || true
-  else
-    cp -r "$node_cache" node_modules || true
-  fi
+  export npm_config_registry="https://registry.npmmirror.com"  # 强制国内镜像
 
   # 检查package.json是否存在
   if [[ ! -f "$CLIENT_DIR/package.json" ]]; then
     die "未找到 package.json：$CLIENT_DIR/package.json（前端代码不完整）"
   fi
 
-  # 构建前端
-  cp -f "$CLIENT_DIR/src/environments/environment.prod.ts" "$CLIENT_DIR/environment.ts" 2>/dev/null || true
-  if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)" >/dev/null 2>&1; then
-    npm run -s build:optimized -- --no-interactive --parallel "$DOCKER_BUILD_PARALLEL"
+  # 清理旧依赖（避免缓存冲突）
+  rm -rf node_modules package-lock.json yarn.lock 2>/dev/null || true
+
+  # 缓存node_modules（修复逻辑：首次强制安装，后续复用）
+  local node_cache="$HOME/.npm-cache/quoteonline-node_modules"
+  mkdir -p "$node_cache" || true
+
+  if [[ ! -d "$node_cache/node_modules" ]]; then
+    log "首次部署，安装前端依赖（国内镜像）..."
+    # 优先npm ci，失败则用npm install兜底
+    if ! npm ci --no-audit --no-fund --force; then
+      warn "npm ci 失败，使用 npm install 兜底安装依赖..."
+      npm install --no-audit --no-fund --force
+    fi
+    # 缓存依赖到本地
+    cp -r node_modules "$node_cache/" || true
   else
-    ng build --configuration production --no-interactive --parallel "$DOCKER_BUILD_PARALLEL"
+    log "复用缓存的前端依赖..."
+    cp -r "$node_cache/node_modules" ./ || true
+    # 确保依赖最新（更新核心包）
+    npm install @angular-devkit/build-angular --no-audit --no-fund --force 2>/dev/null || true
   fi
 
-  [[ -f "$DIST_DIR/index.html" ]] || die "前端构建失败：$DIST_DIR/index.html 不存在"
+  # 检查核心构建依赖是否存在
+  if [[ ! -d "node_modules/@angular-devkit/build-angular" ]]; then
+    log "缺失Angular构建核心依赖，手动安装..."
+    npm install @angular-devkit/build-angular --save-dev --no-audit --no-fund --force
+  fi
+
+  # 检查Angular CLI是否链接
+  if ! ng version >/dev/null 2>&1; then
+    log "Angular CLI 未链接，重新安装..."
+    npm install -g @angular/cli --force
+    npm link @angular/cli 2>/dev/null || true
+  fi
+
+  # 复制环境文件（容错）
+  if [[ -f "$CLIENT_DIR/src/environments/environment.prod.ts" ]]; then
+    cp -f "$CLIENT_DIR/src/environments/environment.prod.ts" "$CLIENT_DIR/environment.ts" 2>/dev/null || true
+  else
+    warn "未找到 environment.prod.ts，跳过环境文件复制"
+  fi
+
+  # 构建前端（优先ng build，兼容build:optimized）
+  log "开始构建前端代码..."
+  if node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['build:optimized']?0:1)" >/dev/null 2>&1; then
+    npm run -s build:optimized -- --no-interactive --parallel "$DOCKER_BUILD_PARALLEL" --force
+  else
+    ng build --configuration production --no-interactive --parallel "$DOCKER_BUILD_PARALLEL" --force
+  fi
+
+  # 检查构建结果
+  if [[ ! -f "$DIST_DIR/index.html" ]]; then
+    die "前端构建失败：$DIST_DIR/index.html 不存在（请检查依赖是否完整）"
+  fi
+
   ok "前端构建完成：$DIST_DIR"
 }
 
