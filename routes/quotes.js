@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const archiver = require('archiver');
+const mongoose = require('mongoose');
 const Quote = require('../models/Quote');
 const User = require('../models/User');
 const SupplierGroup = require('../models/SupplierGroup');
@@ -11,28 +12,17 @@ const { auth, authorize } = require('../middleware/auth');
 const emailService = require('../services/mailgunService');
 const logger = require('../utils/logger');
 const PermissionUtils = require('../utils/permissionUtils');
+const GridFSStorage = require('../utils/gridfsStorage');
 const router = express.Router();
 const iconv = require('iconv-lite');
 
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    // 使用时间戳和随机数生成唯一文件名，避免冲突
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const ext = path.extname(file.originalname);
-    cb(null, `${timestamp}_${randomSuffix}${ext}`);
-  }
-});
+// 初始化 GridFS 存储实例
+const gridfsStorage = new GridFSStorage();
 
 
-
+// 使用GridFS存储文件
 const upload = multer({ 
-  storage: storage,
+  storage: multer.memoryStorage(), // 使用内存存储，然后手动保存到GridFS
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit per file
     fieldSize: 10 * 1024 * 1024, // 10MB field size limit
@@ -57,6 +47,78 @@ const upload = multer({
     }
   }
 });
+
+// GridFS存储函数
+const saveToGridFS = (file, quoteId, fileType) => {
+  return new Promise((resolve, reject) => {
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+      bucketName: 'fs'
+    });
+    
+    const uploadStream = bucket.openUploadStream(
+      `${quoteId}_${fileType}_${Date.now()}_${file.originalname}`,
+      {
+        metadata: {
+          originalName: file.originalname,
+          quoteId: quoteId,
+          fileType: fileType,
+          uploadedAt: new Date()
+        }
+      }
+    );
+    
+    uploadStream.end(file.buffer);
+    
+    uploadStream.on('finish', () => {
+      resolve({
+        filename: file.originalname,
+        originalName: file.originalname,
+        path: uploadStream.id.toString(), // 存储GridFS文件ID
+        size: file.size,
+        uploadedAt: new Date(),
+        gridfsId: uploadStream.id // 存储GridFS ObjectId
+      });
+    });
+    
+    uploadStream.on('error', reject);
+  });
+};
+
+// GridFS文件读取函数
+const readFromGridFS = (fileId) => {
+  return new Promise((resolve, reject) => {
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+      bucketName: 'fs'
+    });
+    
+    const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(fileId));
+    
+    let chunks = [];
+    downloadStream.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    
+    downloadStream.on('end', () => {
+      resolve(Buffer.concat(chunks));
+    });
+    
+    downloadStream.on('error', reject);
+  });
+};
+
+// GridFS文件删除函数
+const deleteFromGridFS = (fileId) => {
+  return new Promise((resolve, reject) => {
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+      bucketName: 'fs'
+    });
+    
+    bucket.delete(new mongoose.Types.ObjectId(fileId), (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+};
 
 
 
@@ -151,17 +213,32 @@ router.post('/', auth, authorize('customer', 'admin'), upload.fields([
     const quoteNumber = await generateQuoteNumber();
     logger.database('生成询价号', 'quotes', { date: new Date() }, Date.now() - dbStartTime);
 
-    // 处理多个客户文件
-    const customerFiles = allFiles.map(file => {
+    // 处理多个客户文件 - 使用GridFS存储
+    const customerFiles = [];
+    for (const file of allFiles) {
       const originalNameFixed = fixFileName(file.originalname);
-      return {
-        filename: file.filename,
+      
+      // 使用GridFS存储文件
+      const fileInfo = await new Promise((resolve, reject) => {
+        gridfsStorage._handleFile(null, {
+          originalname: originalNameFixed,
+          mimetype: file.mimetype,
+          stream: require('stream').Readable.from(file.buffer)
+        }, (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        });
+      });
+      
+      customerFiles.push({
+        filename: fileInfo.filename,
         originalName: originalNameFixed,
-        path: file.path,
-        size: file.size,
-        uploadedAt: new Date()
-      };
-    });
+        path: fileInfo.path, // GridFS文件ID
+        size: fileInfo.size,
+        uploadedAt: new Date(),
+        gridfsId: fileInfo.fileId // 保存GridFS文件ID
+      });
+    }
 
     // 获取客户的客户群组
     const customer = await User.findById(req.user.userId)
@@ -452,7 +529,7 @@ router.put('/:id', auth, upload.fields([
     }
 
     // Check permissions
-    if (req.user.role === 'customer' && quote.customer._id?.toString() !== req.user.userId) {
+    if (req.user.role === 'customer' && quote.customer.toString() !== req.user.userId) {
       return res.status(403).json({ message: '权限不足' });
     }
 
@@ -505,14 +582,22 @@ router.put('/:id', auth, upload.fields([
         const updatedFiles = [...quote[fileArrayName]];
         const deletedFile = updatedFiles.splice(fileIndex, 1)[0];
         
-        // 删除物理文件
+        // 删除GridFS物理文件 - 异步删除，不阻塞业务流程
         try {
-          if (fs.existsSync(deletedFile.path)) {
-            fs.unlinkSync(deletedFile.path);
-            logger.info(`已删除物理文件: ${deletedFile.path}`);
+          // 使用gridfsId字段，这是正确的字段名
+          if (deletedFile.gridfsId || deletedFile.fileId || deletedFile.path || deletedFile._id) {
+            // 异步删除文件，不等待结果
+            gridfsStorage._removeFile(null, deletedFile, (error) => {
+              if (error) {
+                console.warn(`删除GridFS文件失败: ${deletedFile.originalName}`, error.message);
+              } else {
+                console.log(`已删除GridFS文件: ${deletedFile.originalName}`);
+              }
+            });
           }
         } catch (error) {
-          logger.error(`删除物理文件失败: ${deletedFile.path}`, error);
+          // 捕获所有错误，但继续删除数据库记录
+          console.warn(`文件删除过程中出错，但继续删除数据库记录: ${deletedFile.originalName}`, error);
         }
         
         // 更新数据库中的文件数组
@@ -602,16 +687,32 @@ router.put('/:id', auth, upload.fields([
         frontendFileType: req.body.fileType
       });
       
-      const newFiles = allFiles.map(file => {
+      // 处理多个文件 - 使用GridFS存储
+      const newFiles = [];
+      for (const file of allFiles) {
         const originalNameFixed = fixFileName(file.originalname);
-        return {
-          filename: file.filename,
+        
+        // 使用GridFS存储文件
+        const fileInfo = await new Promise((resolve, reject) => {
+          gridfsStorage._handleFile(null, {
+            originalname: originalNameFixed,
+            mimetype: file.mimetype,
+            stream: require('stream').Readable.from(file.buffer)
+          }, (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          });
+        });
+        
+        newFiles.push({
+          filename: fileInfo.filename,
           originalName: originalNameFixed,
-          path: file.path,
-          size: file.size,
-          uploadedAt: new Date()
-        };
-      });
+          path: fileInfo.path, // GridFS文件ID
+          size: fileInfo.size,
+          uploadedAt: new Date(),
+          gridfsId: fileInfo.fileId // 保存GridFS文件ID
+        });
+      }
       
       // 优先使用前端传递的文件类型，如果没有则根据用户角色推断
       let targetFileArray;
@@ -1108,7 +1209,7 @@ router.delete('/:id', auth, async (req, res) => {
     }
 
     // Check permissions
-    if (req.user.role === 'customer' && quote.customer._id?.toString() !== req.user.userId) {
+    if (req.user.role === 'customer' && quote.customer.toString() !== req.user.userId) {
       return res.status(403).json({ message: '权限不足' });
     }
 
@@ -1116,38 +1217,49 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(403).json({ message: '报价员不能删除询价单' });
     }
 
-    // Delete associated files
-    const fs = require('fs');
-    let deletedFiles = [];
+    // Delete associated files from GridFS
+    const deletedFiles = [];
     
     // 删除客户文件数组
     if (quote.customerFiles && quote.customerFiles.length > 0) {
-      quote.customerFiles.forEach(file => {
-        if (file.path && fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-          deletedFiles.push(file.originalName);
+      for (const file of quote.customerFiles) {
+        try {
+          gridfsStorage._removeFile(null, file, (error) => {
+            if (!error) deletedFiles.push(file.originalName);
+            else console.warn(`删除客户文件失败: ${file.originalName}`, error.message);
+          });
+        } catch (error) {
+          console.warn(`删除客户文件时出错: ${file.originalName}`, error.message);
         }
-      });
+      }
     }
     
     // 删除供应商文件数组
     if (quote.supplierFiles && quote.supplierFiles.length > 0) {
-      quote.supplierFiles.forEach(file => {
-        if (file.path && fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-          deletedFiles.push(file.originalName);
+      for (const file of quote.supplierFiles) {
+        try {
+          gridfsStorage._removeFile(null, file, (error) => {
+            if (!error) deletedFiles.push(file.originalName);
+            else console.warn(`删除供应商文件失败: ${file.originalName}`, error.message);
+          });
+        } catch (error) {
+          console.warn(`删除供应商文件时出错: ${file.originalName}`, error.message);
         }
-      });
+      }
     }
     
     // 删除报价员文件数组
     if (quote.quoterFiles && quote.quoterFiles.length > 0) {
-      quote.quoterFiles.forEach(file => {
-        if (file.path && fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-          deletedFiles.push(file.originalName);
+      for (const file of quote.quoterFiles) {
+        try {
+          gridfsStorage._removeFile(null, file, (error) => {
+            if (!error) deletedFiles.push(file.originalName);
+            else console.warn(`删除报价员文件失败: ${file.originalName}`, error.message);
+          });
+        } catch (error) {
+          console.warn(`删除报价员文件时出错: ${file.originalName}`, error.message);
         }
-      });
+      }
     }
     
     // 记录删除的文件
@@ -1180,7 +1292,7 @@ router.get('/:id/download/:fileType', auth, async (req, res) => {
     }
 
     // Check permissions
-    if (req.user.role === 'customer' && quote.customer._id?.toString() !== req.user.userId) {
+    if (req.user.role === 'customer' && quote.customer.toString() !== req.user.userId) {
       return res.status(403).json({ message: '权限不足' });
     }
 
@@ -1286,13 +1398,21 @@ router.get('/:id/download/:fileType', auth, async (req, res) => {
       }
     }
 
+    // 从GridFS读取文件流
+    const downloadStream = await gridfsStorage.getFileStream(targetFile.path);
+    
     // 使用正确的文件名编码，避免Windows下的编码问题
     const safeFileName = `${quote.quoteNumber}_${fileType}_${Date.now()}${path.extname(targetFile.originalName)}`;
     
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(safeFileName)}`);
     
-    return fs.createReadStream(filePath).pipe(res);
+    downloadStream.pipe(res);
+    
+    downloadStream.on('error', (error) => {
+      logger.error('文件下载失败', { error: error.message, fileId: targetFile.path });
+      res.status(500).json({ message: '文件下载失败', error: error.message });
+    });
   } catch (error) {
     logger.request(req, Date.now() - (req.startTime || Date.now()), error);
     res.status(500).json({ message: '服务器错误', error: error.message });
@@ -1392,12 +1512,19 @@ router.get('/:id/download/:fileType/batch', auth, async (req, res) => {
     
     archive.pipe(res);
     
-    // 添加文件到ZIP
-    for (const file of files) {
-      if (fs.existsSync(file.path)) {
-        archive.file(file.path, { name: file.originalName });
+    // 添加文件到ZIP - 从GridFS读取文件流（并行处理）
+    const filePromises = files.map(async (file) => {
+      try {
+        const downloadStream = await gridfsStorage.getFileStream(file.path);
+        archive.append(downloadStream, { name: file.originalName });
+      } catch (error) {
+        logger.error(`添加文件到ZIP失败: ${file.originalName}`, { error: error.message });
+        // 继续处理其他文件
       }
-    }
+    });
+    
+    // 等待所有文件处理完成
+    await Promise.all(filePromises);
     
     archive.finalize();
     

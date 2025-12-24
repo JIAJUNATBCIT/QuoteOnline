@@ -22,7 +22,6 @@ services:
 
     volumes:
       - ./logs:/app/logs
-      - ./uploads:/app/uploads
 
     # 不对外暴露，只给同网络的 nginx 用
     expose:

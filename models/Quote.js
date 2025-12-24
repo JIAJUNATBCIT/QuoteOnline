@@ -25,31 +25,43 @@ const QuoteSchema = new mongoose.Schema({
   customerFiles: [{
     filename: String,
     originalName: String,
-    path: String,
+    path: String, // 保持为字符串，存储GridFS文件ID
     size: Number,
     uploadedAt: {
       type: Date,
       default: Date.now
+    },
+    gridfsId: { // 新增GridFS文件ID字段
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'fs.files'
     }
   }],
   quoterFiles: [{
     filename: String,
     originalName: String,
-    path: String,
+    path: String, // 保持为字符串，存储GridFS文件ID
     size: Number,
     uploadedAt: {
       type: Date,
       default: Date.now
+    },
+    gridfsId: { // 新增GridFS文件ID字段
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'fs.files'
     }
   }],
   supplierFiles: [{
     filename: String,
     originalName: String,
-    path: String,
+    path: String, // 保持为字符串，存储GridFS文件ID
     size: Number,
     uploadedAt: {
       type: Date,
       default: Date.now
+    },
+    gridfsId: { // 新增GridFS文件ID字段
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'fs.files'
     }
   }],
   supplier: {

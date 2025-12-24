@@ -73,8 +73,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files
-app.use(config.frontend.uploadUrl, express.static(path.join(__dirname, config.server.uploadPath)));
+// Static file serving is now handled by GridFS API routes
 
 // Connect to MongoDB with optimized settings
 mongoose.connection.on('connected', () => {
@@ -96,7 +95,10 @@ mongoose.connect(config.mongodb.uri, config.mongodb.options)
   // Routes
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/users', require('./routes/users'));
+  
+  // 使用GridFS存储的询价单路由
   app.use('/api/quotes', require('./routes/quotes'));
+  
   app.use('/api/supplierGroups', require('./routes/supplierGroups'));
   app.use('/api/customer-groups', require('./routes/customerGroups'));
   app.use('/api/config', require('./routes/config'));

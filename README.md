@@ -101,7 +101,7 @@ QuoteOnline/
 ├── routes/                 # Express路由
 ├── middleware/             # 中间件
 ├── services/               # 业务服务
-├── uploads/                # 文件上传目录
+├── utils/                  # 工具函数
 ├── server.js              # 服务器入口
 └── package.json           # 项目配置
 ```

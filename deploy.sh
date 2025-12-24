@@ -226,9 +226,9 @@ clone_repo() {
 # 创建目录
 ensure_dirs() {
   log "创建必要目录..."
-  mkdir -p "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads" "$DIST_DIR/.well-known/acme-challenge" || true
-  chmod -R 755 "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads" "$DIST_DIR/.well-known" || true
-  chown -R 1000:1000 "$PROJECT_DIR/logs" "$PROJECT_DIR/uploads" || true
+  mkdir -p "$PROJECT_DIR/logs" "$DIST_DIR/.well-known/acme-challenge" || true
+  chmod -R 755 "$PROJECT_DIR/logs" "$DIST_DIR/.well-known" || true
+  chown -R 1000:1000 "$PROJECT_DIR/logs" || true
   ok "目录创建完成"
 }
 
@@ -245,7 +245,6 @@ ensure_stub_env() {
 NODE_ENV=production
 PORT=3000
 FRONTEND_URL=https://${DOMAIN}
-UPLOAD_PATH=./uploads
 MAX_FILE_SIZE=10485760
 
 # placeholders (will be overwritten by GitHub Actions)
