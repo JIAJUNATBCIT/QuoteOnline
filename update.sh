@@ -4,7 +4,7 @@
 # 代码更新和容器重启脚本
 # ============================================
 
-set -euo pipefail
+set -eo pipefail
 
 # 颜色定义
 GREEN='\033[0;32m'
@@ -23,39 +23,76 @@ warn() { echo -e "${YELLOW}[$(date '+%H:%M:%S')] ⚠ $1${NC}"; }
 
 # 检查root权限
 check_root() {
-    [[ $EUID -ne 0 ]] && { error "需要root权限"; exit 1; }
+    if [[ $EUID -ne 0 ]]; then
+        error "需要root权限"
+        exit 1
+    fi
+    success "权限检查通过"
 }
 
 # 检查项目目录
 check_project() {
-    [[ -d "$PROJECT_DIR" ]] || { error "项目目录不存在: $PROJECT_DIR"; exit 1; }
+    if [[ ! -d "$PROJECT_DIR" ]]; then
+        error "项目目录不存在: $PROJECT_DIR"
+        exit 1
+    fi
+    success "项目目录检查通过"
 }
 
 # 拉取最新代码
 update_code() {
     log "拉取最新代码..."
-    cd "$PROJECT_DIR"
+    cd "$PROJECT_DIR" || { error "无法切换到项目目录"; exit 1; }
     
-    # 检查是否有未提交的更改
-    if ! git diff --quiet || ! git diff --cached --quiet; then
-        warn "检测到未提交的更改，先暂存..."
-        git stash push -m "自动更新前暂存 $(date)"
+    # 检查是否为Git仓库
+    if [[ ! -d ".git" ]]; then
+        error "当前目录不是Git仓库"
+        exit 1
     fi
     
-    git pull origin main
+    # 检查是否有未提交的更改
+    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        warn "检测到未提交的更改，先暂存..."
+        git stash push -m "自动更新前暂存 $(date)" || {
+            warn "暂存失败，继续执行..."
+        }
+    fi
+    
+    git pull origin main || {
+        error "代码拉取失败"
+        exit 1
+    }
     success "代码更新完成"
 }
 
 # 重启Docker容器
 restart_containers() {
     log "重启Docker容器..."
-    cd "$PROJECT_DIR"
+    cd "$PROJECT_DIR" || { error "无法切换到项目目录"; exit 1; }
+    
+    # 检查docker-compose.yml是否存在
+    if [[ ! -f "docker-compose.yml" ]]; then
+        error "docker-compose.yml文件不存在"
+        exit 1
+    fi
     
     # 停止容器
-    docker compose down
+    log "停止现有容器..."
+    if docker compose down 2>/dev/null; then
+        success "容器停止成功"
+    else
+        warn "没有运行中的容器或停止失败，继续..."
+    fi
     
     # 重新构建并启动
-    docker compose up -d --build
+    log "构建并启动容器..."
+    if docker compose up -d --build; then
+        success "容器启动成功"
+    else
+        error "容器启动失败"
+        docker compose ps
+        exit 1
+    fi
     
     # 等待服务启动
     log "等待服务启动..."
@@ -63,7 +100,7 @@ restart_containers() {
     
     # 检查容器状态
     if docker compose ps | grep -q "Up"; then
-        success "容器重启成功"
+        success "容器状态正常"
     else
         error "容器启动失败"
         docker compose ps
