@@ -116,9 +116,18 @@ restart_containers() {
         warn "删除镜像失败，继续执行..."
     }
     
-    # 强制重新构建并启动
-    log "强制重新构建并启动容器..."
-    if docker compose up -d --build --force-recreate --no-cache; then
+    # 强制重新构建镜像
+    log "强制重新构建镜像..."
+    if docker compose build --pull --no-cache; then
+        success "镜像构建成功"
+    else
+        error "镜像构建失败"
+        exit 1
+    fi
+    
+    # 启动容器
+    log "启动容器..."
+    if docker compose up -d --force-recreate; then
         success "容器启动成功"
     else
         error "容器启动失败"
