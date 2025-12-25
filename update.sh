@@ -228,10 +228,15 @@ health_check() {
     fi
     
     # 检查前端是否通过 NGINX 可访问
-    if curl -f http://localhost/ >/dev/null 2>&1; then
+    # 先尝试HTTP，如果失败再尝试健康检查端点
+    if curl -f http://localhost/health >/dev/null 2>&1; then
         success "前端服务通过 NGINX 访问正常"
+    elif curl -k -f https://localhost/health >/dev/null 2>&1; then
+        success "前端服务通过 NGINX HTTPS 访问正常"
     else
         warn "前端服务通过 NGINX 访问失败，但容器仍在运行"
+        # 显示NGINX状态用于调试
+        docker compose logs nginx --tail=10 2>/dev/null || true
     fi
 }
 
