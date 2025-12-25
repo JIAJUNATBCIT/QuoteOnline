@@ -205,7 +205,7 @@
 
 
       <!-- 分配群组（下拉菜单样式） -->
-      <div *ngIf="quote && authService.hasRole('quoter') && (quote.status === 'pending' || quote.status === 'in_progress')" class="mt-4">
+      <div *ngIf="quote && (authService.hasRole('quoter') || authService.hasRole('admin')) && (quote.status === 'pending' || quote.status === 'in_progress')" class="mt-4">
         <h5>分配供应商</h5>
         <div class="mb-3">
           <div class="input-group">

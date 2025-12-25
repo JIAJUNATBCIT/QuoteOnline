@@ -80,8 +80,11 @@ export class QuoteDetailComponent implements OnInit {
         this.loadQuoters();
       }
       if (this.authService.hasRole('quoter') || this.authService.hasRole('admin')) {
+        console.log('User has quoter/admin role, loading suppliers and groups...');
         this.loadSuppliers();
         this.loadSupplierGroups();
+      } else {
+        console.log('User does not have quoter/admin role. Role:', this.authService.getCurrentUser()?.role);
       }
     }
   }
@@ -904,11 +907,19 @@ export class QuoteDetailComponent implements OnInit {
   }
 
   assignSingleGroup() {
-    if (!this.quote || !this.selectedGroupId) return;
+    // 权限检查：只有报价员或管理员可以分配
+    if (!this.authService.hasRole('quoter') && !this.authService.hasRole('admin')) {
+      alert('权限不足，只有报价员和管理员可以分配供应商群组');
+      return;
+    }
     
+    if (!this.quote || !this.selectedGroupId) {
+      return;
+    }
     this.assigning = true;
     this.quoteService.assignGroupsToQuote(this.quote._id, [this.selectedGroupId]).subscribe({
       next: (quote) => {
+        console.log('API success:', quote);
         this.ngZone.run(() => {
           this.quote = quote;
           this.assigning = false;
@@ -917,10 +928,11 @@ export class QuoteDetailComponent implements OnInit {
         });
       },
       error: (error) => {
+        console.error('API error:', error);
         this.ngZone.run(() => {
           console.error('分配供应商失败:', error);
           this.assigning = false;
-          alert('分配供应商失败');
+          alert('分配供应商失败: ' + (error.message || error.error?.message || '未知错误'));
         });
       }
     });

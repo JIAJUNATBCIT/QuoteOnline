@@ -81,7 +81,19 @@ export class UserListComponent implements OnInit {
   }
 
   deleteUser(userId: string) {
-    if (confirm('确定要删除这个用户吗？此操作不可恢复。')) {
+    // 防止删除自己
+    if (this.currentUserId === userId) {
+      alert('不能删除自己的账户');
+      return;
+    }
+    
+    // 确认删除
+    const userToDelete = this.users.find(u => u._id === userId);
+    const confirmMessage = userToDelete 
+      ? `确定要删除用户 "${userToDelete.name}" (${this.getRoleDisplayName(userToDelete.role)}) 吗？此操作不可恢复。`
+      : '确定要删除这个用户吗？此操作不可恢复。';
+    
+    if (confirm(confirmMessage)) {
       this.userService.deleteUser(userId).subscribe({
         next: () => {
           this.loadUsers();
@@ -89,7 +101,7 @@ export class UserListComponent implements OnInit {
         },
         error: (error) => {
           console.error('删除用户失败:', error);
-          alert('删除失败');
+          alert('删除失败: ' + (error.error?.message || error.message || '未知错误'));
         }
       });
     }

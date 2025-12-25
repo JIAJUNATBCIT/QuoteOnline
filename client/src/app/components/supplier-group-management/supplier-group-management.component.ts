@@ -86,6 +86,11 @@ export class SupplierGroupManagementComponent implements OnInit, OnDestroy {
     });
   }
 
+  // 权限检查方法
+  hasPermission(): boolean {
+    return this.authService.hasRole(['admin', 'quoter']);
+  }
+
   openCreateModal() {
     this.groupForm = {
       name: '',

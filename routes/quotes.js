@@ -984,7 +984,8 @@ router.patch('/:id/assign-supplier', auth, async (req, res) => {
     const { supplierId } = req.body;
     
     // 验证权限：只有报价员和管理员可以分配供应商
-    if (!['quoter', 'admin'].includes(req.user.role)) {
+    const userRole = req.userData?.role || req.user.role;
+    if (!['quoter', 'admin'].includes(userRole)) {
       return res.status(403).json({ message: '权限不足' });
     }
 
@@ -1053,7 +1054,10 @@ router.patch('/:id/assign-groups', auth, async (req, res) => {
     const { groupIds } = req.body;
     
     // 验证权限：只有报价员和管理员可以分配群组
-    if (!['quoter', 'admin'].includes(req.user.role)) {
+    // 优先使用数据库中的用户角色，如果没有则使用token中的角色
+    const userRole = req.userData?.role || req.user.role;
+    
+    if (!['quoter', 'admin'].includes(userRole)) {
       return res.status(403).json({ message: '权限不足' });
     }
 

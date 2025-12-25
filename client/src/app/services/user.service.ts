@@ -64,4 +64,5 @@ export class UserService {
     const url = `${environment.apiUrl}/users/${id}/password`;
     return this.http.patch(url, { newPassword });
   }
+
 }

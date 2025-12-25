@@ -30,12 +30,12 @@
           </thead>
           <tbody>
             <tr *ngFor="let user of users" [class.table-warning]="currentUserId === user._id">
-              <td>
+              <td data-label="姓名">
                 {{ user.name }}
                 <span *ngIf="currentUserId === user._id" class="badge bg-info ms-2">当前用户</span>
               </td>
-              <td>{{ user.email }}</td>
-              <td>
+              <td data-label="邮箱">{{ user.email }}</td>
+              <td data-label="角色">
                 <span class="badge" [ngClass]="{
                   'bg-primary': user.role === 'customer',
                   'bg-success': user.role === 'quoter',
@@ -45,7 +45,7 @@
                   {{ getRoleDisplayName(user.role) }}
                 </span>
               </td>
-              <td>
+              <td data-label="状态">
                 <span class="badge" [ngClass]="{
                   'bg-success': user.isActive,
                   'bg-secondary': !user.isActive
@@ -53,8 +53,8 @@
                   {{ user.isActive ? '活跃' : '禁用' }}
                 </span>
               </td>
-              <td>{{ user.createdAt | date:'yyyy-MM-dd HH:mm' }}</td>
-              <td>
+              <td data-label="创建时间">{{ user.createdAt | date:'yyyy-MM-dd HH:mm' }}</td>
+              <td data-label="操作">
                 <div class="btn-group btn-group-sm">
                   <!-- 修改密码 -->
                   <button class="btn btn-outline-warning" 
@@ -102,8 +102,9 @@
                   <!-- 删除用户 -->
                   <button class="btn btn-outline-danger" 
                           (click)="deleteUser(user._id)"
-                          [disabled]="user.role === 'admin' || !canModifyUserRole(user)">
-                    删除
+                          [disabled]="!canModifyUserRole(user)"
+                          [title]="currentUserId === user._id ? '不能删除自己的账户' : '删除用户'">
+                    <i class="bi bi-trash"></i> 删除
                   </button>
                 </div>
               </td>

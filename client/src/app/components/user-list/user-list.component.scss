@@ -5,6 +5,123 @@
   margin-top: 80px; // Height of fixed navbar + some spacing
 }
 
+// 移动端响应式设计
+@media (max-width: 768px) {
+  .user-list-content {
+    margin-top: 60px; // 减少移动端顶部边距
+    padding: 0 10px;
+  }
+  
+  .card {
+    margin: 0 -10px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  
+  .card-header {
+    padding: 15px;
+  }
+  
+  .card-body {
+    padding: 0;
+  }
+  
+  // 隐藏表格头部，改用卡片式布局
+  .table-responsive {
+    .table {
+      thead {
+        display: none;
+      }
+      
+      tbody {
+        tr {
+          display: block;
+          border-bottom: 1px solid #dee2e6;
+          margin-bottom: 15px;
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          overflow: hidden;
+          
+          td {
+            display: block;
+            position: relative;
+            padding: 12px 15px 12px 100px;
+            border: none;
+            text-align: left;
+            white-space: normal;
+            
+            &:before {
+              content: attr(data-label);
+              position: absolute;
+              left: 15px;
+              width: 80px;
+              font-weight: 600;
+              color: #495057;
+              font-size: 0.875rem;
+            }
+          }
+          
+          &:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+          }
+        }
+      }
+    }
+  }
+  
+  // 操作按钮组优化
+  .btn-group {
+    flex-direction: column;
+    gap: 8px;
+    
+    .btn {
+      width: 100%;
+      text-align: center;
+      justify-content: center;
+      padding: 8px 12px;
+      font-size: 0.875rem;
+      
+      i {
+        margin-right: 5px;
+      }
+    }
+    
+    // 下拉菜单移动端优化
+    .dropdown-menu {
+      position: static !important;
+      transform: none !important;
+      width: 100%;
+      margin-top: 8px;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .user-list-content {
+    padding: 0 5px;
+    margin-top: 50px;
+  }
+  
+  .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .table td {
+    padding: 10px 12px 10px 85px !important;
+    
+    &:before {
+      font-size: 0.8rem;
+      width: 70px;
+    }
+  }
+}
+
 .user-list-container {
   max-width: 1400px;
   margin: 0 auto;
