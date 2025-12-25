@@ -163,6 +163,12 @@ restart_containers() {
     
     # 检查并修复 nginx.conf 问题
     if [[ ! -f "client/nginx.conf" ]]; then
+        # 先删除可能存在的目录
+        if [[ -d "client/nginx.conf" ]]; then
+            log "删除错误的 nginx.conf 目录..."
+            rm -rf client/nginx.conf
+        fi
+        
         log "创建默认 nginx.conf 文件..."
         cat > "client/nginx.conf" <<'EOF'
 server {
@@ -220,11 +226,7 @@ EOF
         warn "没有运行中的容器或停止失败，继续..."
     fi
     
-    # 删除可能存在的错误目录
-    if [[ -d "client/nginx.conf" ]]; then
-        log "删除错误的 nginx.conf 目录..."
-        rm -rf client/nginx.conf
-    fi
+
     
     # 删除相关镜像以避免缓存问题
     log "删除相关镜像..."
