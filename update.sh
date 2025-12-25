@@ -107,10 +107,34 @@ build_frontend() {
     
     # 禁用 Angular CLI 交互并构建前端生产版本
     log "构建前端生产版本..."
-    cd client && export NG_CLI_ANALYTICS=ci && npx ng build --configuration production --no-progress && cd .. || {
+    cd client
+    
+    # 设置环境变量完全禁用交互
+    export NG_CLI_ANALYTICS=ci
+    export NG_CLI_INTERACTIVE=false
+    export NG_DISABLE_AUTO_COMPLETE=true
+    export CI=true
+    
+    # 创建 angular.json 配置临时禁用自动补全
+    if ! grep -q '"disableAutoComplete"' angular.json; then
+        # 备份原始文件
+        cp angular.json angular.json.bak
+        # 临时添加禁用自动补全的配置
+        sed -i 's/"cli": {/"cli": {\n      "disableAutoComplete": true,/' angular.json
+    fi
+    
+    # 使用 yes 命令自动回答 'n' 来跳过所有提示
+    yes 'n' | timeout 300 npx ng build --configuration production --no-progress || {
+        # 恢复 angular.json
+        mv angular.json.bak angular.json 2>/dev/null || true
+        cd ..
         error "前端构建失败"
         exit 1
     }
+    
+    # 恢复 angular.json
+    mv angular.json.bak angular.json 2>/dev/null || true
+    cd ..
     
     # 检查构建结果
     if [[ ! -d "client/dist/quote-online-client" ]]; then
