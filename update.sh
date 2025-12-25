@@ -124,13 +124,17 @@ build_frontend() {
     fi
     
     # 使用 yes 命令自动回答 'n' 来跳过所有提示
-    yes 'n' | timeout 300 npx ng build --configuration production --no-progress || {
+    yes 'n' | timeout 300 npx ng build --configuration production --no-progress
+    BUILD_EXIT_CODE=$?
+    
+    # 检查构建结果（timeout 返回 124 表示超时，其他非零码才是真正失败）
+    if [[ $BUILD_EXIT_CODE -ne 0 && $BUILD_EXIT_CODE -ne 124 ]]; then
         # 恢复 angular.json
         mv angular.json.bak angular.json 2>/dev/null || true
         cd ..
-        error "前端构建失败"
+        error "前端构建失败 (退出码: $BUILD_EXIT_CODE)"
         exit 1
-    }
+    fi
     
     # 恢复 angular.json
     mv angular.json.bak angular.json 2>/dev/null || true
