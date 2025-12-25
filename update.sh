@@ -170,38 +170,44 @@ restart_containers() {
         fi
         
         log "创建默认 nginx.conf 文件..."
-        cat > "client/nginx.conf" <<'EOF'
+        
+        # 检查是否有模板文件
+        if [[ -f "client/nginx.conf.template" ]]; then
+            log "使用模板文件生成 HTTPS 配置..."
+            # 使用默认域名替换模板
+            sed 's/{{DOMAIN}}/_/g' "client/nginx.conf.template" > "client/nginx.conf"
+        elif [[ -f "client/nginx.http.conf" ]]; then
+            log "使用 HTTP 配置文件..."
+            # 使用 HTTP 配置并替换域名变量
+            sed 's/{{DOMAIN}}/_/g' "client/nginx.http.conf" > "client/nginx.conf"
+        else
+            log "创建基础 HTTP 配置..."
+            # 创建基础配置，API路径正确
+            cat > "client/nginx.conf" <<'EOF'
 server {
     listen 80;
     server_name _;
-    
-    # 前端静态文件
-    location / {
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location /.well-known/acme-challenge/ {
         root /usr/share/nginx/html;
-        index index.html index.htm;
-        try_files $uri $uri/ /index.html;
-        
-        # 缓存静态资源
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
+        try_files $uri =404;
     }
-    
-    # 代理后端 API
+
     location /api/ {
-        proxy_pass http://backend:3000/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_pass http://backend:3000/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
     }
-    
-    # 健康检查端点
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
     location /health {
         access_log off;
         return 200 "healthy\n";
@@ -209,6 +215,7 @@ server {
     }
 }
 EOF
+        fi
         success "默认 nginx.conf 已创建"
     fi
     
