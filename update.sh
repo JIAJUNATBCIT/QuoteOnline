@@ -85,6 +85,42 @@ update_code() {
 
 
 
+# 构建前端代码
+build_frontend() {
+    log "构建前端代码..."
+    cd "$PROJECT_DIR" || { error "无法切换到项目目录"; exit 1; }
+    
+    # 检查client目录是否存在
+    if [[ ! -d "client" ]]; then
+        error "client目录不存在"
+        exit 1
+    fi
+    
+    # 安装前端依赖（如果需要）
+    if [[ ! -d "client/node_modules" ]]; then
+        log "安装前端依赖..."
+        cd client && npm install && cd .. || {
+            error "安装前端依赖失败"
+            exit 1
+        }
+    fi
+    
+    # 构建前端生产版本
+    log "构建前端生产版本..."
+    cd client && ng build --configuration production && cd .. || {
+        error "前端构建失败"
+        exit 1
+    }
+    
+    # 检查构建结果
+    if [[ ! -d "client/dist/quote-online-client" ]]; then
+        error "前端构建输出目录不存在"
+        exit 1
+    fi
+    
+    success "前端构建完成"
+}
+
 # 重启Docker容器
 restart_containers() {
     log "重启Docker容器..."
@@ -182,6 +218,7 @@ main() {
     check_root
     check_project
     update_code
+    build_frontend
     restart_containers
     health_check
     show_info
