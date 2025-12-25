@@ -123,16 +123,17 @@ build_frontend() {
         sed -i 's/"cli": {/"cli": {\n      "disableAutoComplete": true,/' angular.json
     fi
     
-    # 使用 yes 命令自动回答 'n' 来跳过所有提示
-    yes 'n' | timeout 300 npx ng build --configuration production --no-progress
-    BUILD_EXIT_CODE=$?
+    # 先尝试正常构建，如果失败再用 yes 处理交互
+    timeout 300 npx ng build --configuration production --no-progress > /dev/null 2>&1 || \
+    timeout 300 sh -c "echo 'n' | npx ng build --configuration production --no-progress" > /dev/null 2>&1 || \
+    timeout 300 sh -c "yes 'n' | npx ng build --configuration production --no-progress" > /dev/null 2>&1
     
-    # 检查构建结果（timeout 返回 124 表示超时，其他非零码才是真正失败）
-    if [[ $BUILD_EXIT_CODE -ne 0 && $BUILD_EXIT_CODE -ne 124 ]]; then
+    # 检查构建是否成功（通过检查输出文件）
+    if [[ ! -d "dist/quote-online-client" ]] || [[ ! -f "dist/quote-online-client/index.html" ]]; then
         # 恢复 angular.json
         mv angular.json.bak angular.json 2>/dev/null || true
         cd ..
-        error "前端构建失败 (退出码: $BUILD_EXIT_CODE)"
+        error "前端构建失败 - 输出文件不存在"
         exit 1
     fi
     
