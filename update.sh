@@ -99,15 +99,15 @@ build_frontend() {
     # 安装前端依赖（如果需要）
     if [[ ! -d "client/node_modules" ]]; then
         log "安装前端依赖..."
-        cd client && npm install && cd .. || {
+        cd client && npm install --no-audit --no-fund && cd .. || {
             error "安装前端依赖失败"
             exit 1
         }
     fi
     
-    # 构建前端生产版本
+    # 禁用 Angular CLI 交互并构建前端生产版本
     log "构建前端生产版本..."
-    cd client && ng build --configuration production && cd .. || {
+    cd client && export NG_CLI_ANALYTICS=ci && npx ng build --configuration production --no-progress && cd .. || {
         error "前端构建失败"
         exit 1
     }
