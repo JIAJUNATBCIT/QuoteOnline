@@ -161,6 +161,51 @@ restart_containers() {
         exit 1
     fi
     
+    # 检查并修复 nginx.conf 问题
+    if [[ ! -f "client/nginx.conf" ]]; then
+        log "创建默认 nginx.conf 文件..."
+        cat > "client/nginx.conf" <<'EOF'
+server {
+    listen 80;
+    server_name _;
+    
+    # 前端静态文件
+    location / {
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+        try_files $uri $uri/ /index.html;
+        
+        # 缓存静态资源
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+    
+    # 代理后端 API
+    location /api/ {
+        proxy_pass http://backend:3000/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    # 健康检查端点
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+}
+EOF
+        success "默认 nginx.conf 已创建"
+    fi
+    
     # 清理Docker缓存和未使用的资源
     log "清理Docker缓存..."
     docker system prune -f || {
@@ -173,6 +218,12 @@ restart_containers() {
         success "容器停止成功"
     else
         warn "没有运行中的容器或停止失败，继续..."
+    fi
+    
+    # 删除可能存在的错误目录
+    if [[ -d "client/nginx.conf" ]]; then
+        log "删除错误的 nginx.conf 目录..."
+        rm -rf client/nginx.conf
     fi
     
     # 删除相关镜像以避免缓存问题
