@@ -52,18 +52,38 @@ update_code() {
     
     # 检查是否有未提交的更改
     if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
-        warn "检测到未提交的更改，先暂存..."
-        git stash push -m "自动更新前暂存 $(date)" || {
-            warn "暂存失败，继续执行..."
+        warn "检测到未提交的更改，将强制覆盖..."
+        
+        # 强制重置到HEAD，丢弃所有本地更改
+        git reset --hard HEAD || {
+            error "重置本地更改失败"
+            exit 1
         }
+        
+        # 清理未跟踪的文件
+        git clean -fd || {
+            warn "清理未跟踪文件失败，继续执行..."
+        }
+        
+        success "本地更改已清理"
     fi
     
-    git pull origin main || {
-        error "代码拉取失败"
+    # 获取最新代码
+    git fetch origin || {
+        error "获取远程代码失败"
         exit 1
     }
-    success "代码更新完成"
+    
+    # 强制覆盖本地代码
+    git reset --hard origin/main || {
+        error "代码重置失败"
+        exit 1
+    }
+    
+    success "代码更新完成（强制覆盖模式）"
 }
+
+
 
 # 重启Docker容器
 restart_containers() {
@@ -134,6 +154,7 @@ show_info() {
 main() {
     echo "========================================"
     echo "      代码更新和容器重启"
+    echo "      强制覆盖模式"
     echo "========================================"
     
     check_root
