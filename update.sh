@@ -275,28 +275,62 @@ EOF
     fi
 }
 
-# 健康检查
+# 健康检查和故障排查
 health_check() {
-    log "执行健康检查..."
+    log "执行健康检查和故障排查..."
     sleep 10
     
-    # 检查后端容器健康状态（通过 Docker 内部健康检查）
+    log "=== 容器状态检查 ==="
+    docker compose ps
+    
+    log "=== 端口占用检查 ==="
+    netstat -tulpn | grep -E ':(80|443|3000)' || ss -tulpn | grep -E ':(80|443|3000)' || echo "端口检查工具不可用"
+    
+    log "=== 后端容器内部检查 ==="
     if docker compose exec backend curl -f http://localhost:3000/health >/dev/null 2>&1; then
         success "后端服务健康检查通过"
     else
-        warn "后端服务健康检查失败，但容器仍在运行"
+        warn "后端服务健康检查失败"
+        docker compose logs backend --tail=10
     fi
     
-    # 检查前端是否通过 NGINX 可访问
-    # 先尝试HTTP，如果失败再尝试健康检查端点
-    if curl -f http://localhost/health >/dev/null 2>&1; then
-        success "前端服务通过 NGINX 访问正常"
-    elif curl -k -f https://localhost/health >/dev/null 2>&1; then
-        success "前端服务通过 NGINX HTTPS 访问正常"
+    log "=== NGINX 配置检查 ==="
+    if docker compose exec nginx nginx -t >/dev/null 2>&1; then
+        success "NGINX 配置语法正确"
     else
-        warn "前端服务通过 NGINX 访问失败，但容器仍在运行"
-        # 显示NGINX状态用于调试
-        docker compose logs nginx --tail=10 2>/dev/null || true
+        error "NGINX 配置语法错误"
+        docker compose exec nginx nginx -t
+    fi
+    
+    log "=== 前端文件检查 ==="
+    if docker compose exec nginx ls -la /usr/share/nginx/html/index.html >/dev/null 2>&1; then
+        success "前端文件存在"
+    else
+        error "前端文件不存在"
+        docker compose exec nginx ls -la /usr/share/nginx/html/ || true
+    fi
+    
+    log "=== NGINX 访问测试 ==="
+    # 先尝试容器内部
+    if docker compose exec nginx curl -f http://localhost/health >/dev/null 2>&1; then
+        success "NGINX 容器内部访问正常"
+    else
+        warn "NGINX 容器内部访问失败"
+    fi
+    
+    # 尝试外部访问
+    if curl -f http://localhost/health >/dev/null 2>&1; then
+        success "前端服务通过 HTTP 访问正常"
+    elif curl -k -f https://localhost/health >/dev/null 2>&1; then
+        success "前端服务通过 HTTPS 访问正常"
+    else
+        warn "前端服务外部访问失败"
+        
+        log "=== NGINX 详细日志 ==="
+        docker compose logs nginx --tail=20
+        
+        log "=== 网络连通性测试 ==="
+        docker compose exec nginx wget -qO- http://backend:3000/api/health || echo "后端API不可达"
     fi
 }
 
