@@ -96,17 +96,29 @@ restart_containers() {
         exit 1
     fi
     
-    # 停止容器
-    log "停止现有容器..."
-    if docker compose down 2>/dev/null; then
+    # 清理Docker缓存和未使用的资源
+    log "清理Docker缓存..."
+    docker system prune -f || {
+        warn "清理Docker缓存失败，继续执行..."
+    }
+    
+    # 停止并移除容器
+    log "停止并移除现有容器..."
+    if docker compose down --volumes --remove-orphans 2>/dev/null; then
         success "容器停止成功"
     else
         warn "没有运行中的容器或停止失败，继续..."
     fi
     
-    # 重新构建并启动
-    log "构建并启动容器..."
-    if docker compose up -d --build; then
+    # 删除相关镜像以避免缓存问题
+    log "删除相关镜像..."
+    docker rmi quoteonline-backend:latest quoteonline-nginx:latest 2>/dev/null || {
+        warn "删除镜像失败，继续执行..."
+    }
+    
+    # 强制重新构建并启动
+    log "强制重新构建并启动容器..."
+    if docker compose up -d --build --force-recreate --no-cache; then
         success "容器启动成功"
     else
         error "容器启动失败"
@@ -116,7 +128,7 @@ restart_containers() {
     
     # 等待服务启动
     log "等待服务启动..."
-    sleep 15
+    sleep 20
     
     # 检查容器状态
     if docker compose ps | grep -q "Up"; then
@@ -124,6 +136,7 @@ restart_containers() {
     else
         error "容器启动失败"
         docker compose ps
+        docker compose logs --tail=50
         exit 1
     fi
 }
