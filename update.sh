@@ -161,62 +161,14 @@ restart_containers() {
         exit 1
     fi
     
-    # 检查并修复 nginx.conf 问题
-    if [[ ! -f "client/nginx.conf" ]]; then
-        # 先删除可能存在的目录
-        if [[ -d "client/nginx.conf" ]]; then
-            log "删除错误的 nginx.conf 目录..."
-            rm -rf client/nginx.conf
-        fi
-        
-        log "创建默认 nginx.conf 文件..."
-        
-        # 检查是否有模板文件
-        if [[ -f "client/nginx.conf.template" ]]; then
-            log "使用模板文件生成 HTTPS 配置..."
-            # 使用默认域名替换模板
-            sed 's/{{DOMAIN}}/_/g' "client/nginx.conf.template" > "client/nginx.conf"
-        elif [[ -f "client/nginx.http.conf" ]]; then
-            log "使用 HTTP 配置文件..."
-            # 使用 HTTP 配置并替换域名变量
-            sed 's/{{DOMAIN}}/_/g' "client/nginx.http.conf" > "client/nginx.conf"
-        else
-            log "创建基础 HTTP 配置..."
-            # 创建基础配置，API路径正确
-            cat > "client/nginx.conf" <<'EOF'
-server {
-    listen 80;
-    server_name _;
-
-    root /usr/share/nginx/html;
-    index index.html;
-
-    location /.well-known/acme-challenge/ {
-        root /usr/share/nginx/html;
-        try_files $uri =404;
-    }
-
-    location /api/ {
-        proxy_pass http://backend:3000/api/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /health {
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
-    }
-}
-EOF
-        fi
-        success "默认 nginx.conf 已创建"
+    # 注意：nginx.conf 应该由 deploy.sh 在生产环境部署时生成
+    # update.sh 不应该创建或修改 nginx.conf 文件
+    # 这里只是确保开发环境不会因为 nginx.conf 文件而出错
+    if [[ ! -f "client/nginx.conf" ]] && [[ -f "client/nginx.http.conf" ]]; then
+        log "开发环境检测到缺失 nginx.conf，创建临时HTTP配置用于测试..."
+        # 仅在开发环境创建临时配置
+        sed 's/{{DOMAIN}}/localhost/g' "client/nginx.http.conf" > "client/nginx.conf"
+        success "已创建开发环境临时nginx配置"
     fi
     
     # 清理Docker缓存和未使用的资源
