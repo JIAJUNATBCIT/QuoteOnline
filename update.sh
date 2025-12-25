@@ -220,10 +220,18 @@ health_check() {
     log "执行健康检查..."
     sleep 10
     
-    if curl -f http://localhost:3000/health >/dev/null 2>&1; then
-        success "服务健康检查通过"
+    # 检查后端容器健康状态（通过 Docker 内部健康检查）
+    if docker compose exec backend curl -f http://localhost:3000/health >/dev/null 2>&1; then
+        success "后端服务健康检查通过"
     else
-        warn "服务健康检查失败，但容器仍在运行"
+        warn "后端服务健康检查失败，但容器仍在运行"
+    fi
+    
+    # 检查前端是否通过 NGINX 可访问
+    if curl -f http://localhost/ >/dev/null 2>&1; then
+        success "前端服务通过 NGINX 访问正常"
+    else
+        warn "前端服务通过 NGINX 访问失败，但容器仍在运行"
     fi
 }
 
